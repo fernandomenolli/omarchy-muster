@@ -1,44 +1,103 @@
 #!/usr/bin/env bash
-# Lists the coding agents running on this machine, one per line:
+# Lists the coding agents running on this machine, one per line, tab separated:
 #
-#   <window-address> <agent-pid> <bytes-written> <agent> <cwd>
+#   <window-address>	<pid>	<bytes-written>	<agent>	<cwd>	<window-title>
 #
-# An agent is found by walking up from its process to whichever ancestor owns a
-# window, so it does not matter how deeply the terminal nests it: a shell, a
-# multiplexer, a wrapper script.
+# One pass over /proc and one call to hyprctl. The first version asked pgrep
+# once per agent name and ran an awk for every step up the process tree, and
+# cost 213ms a scan; this one costs about ten. Nothing here is clever, it just
+# reads the tree once and keeps it in memory.
 #
 # Bytes written is the state signal. An agent producing output is working; one
-# waiting for you writes nothing. Measured here, differences ran three orders
-# of magnitude: twenty thousand bytes against sixty.
+# waiting for you writes nothing. On a real desktop the difference ran three
+# orders of magnitude: twenty thousand bytes against sixty.
 
 set -uo pipefail
+
+# A compiled version of this exact scan ships for some architectures. It is
+# about twice as fast, and this hands straight over to it when one is present.
+# Nothing depends on that: what follows is the whole scan, and it is also the
+# readable definition of what the binary does.
+compiled="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)/backend/dist/$(uname -m)/muster-scan"
+
+# Asked once at startup, so the caller can go straight to whichever this is
+# from then on. Handing over with exec on every scan costs a bash startup,
+# which is half of what the compiled version saves.
+if [[ ${1:-} == --which ]]; then
+  [[ -x $compiled ]] && echo "$compiled" || echo "${BASH_SOURCE[0]}"
+  exit 0
+fi
+
+[[ -x $compiled ]] && exec "$compiled"
 
 AGENTS="${MUSTER_AGENTS:-claude codex gemini aider opencode amp goose crush}"
 
 command -v hyprctl >/dev/null || exit 0
 command -v jq >/dev/null || exit 0
 
-# pid -> window address, for every window on the machine
-declare -A window_of
-while IFS=$'\t' read -r pid address; do
-  [[ -n $pid ]] && window_of[$pid]="$address"
-done < <(hyprctl -j clients | jq -r '.[] | "\(.pid)\t\(.address)"')
+windows=$(hyprctl -j clients | jq -r '.[] | "\(.pid)\t\(.address)\t\(.title)"')
 
-owning_window() {
-  local pid="$1" hops=0
-  while [[ -n $pid && $pid != 1 && $hops -lt 12 ]]; do
-    [[ -n ${window_of[$pid]:-} ]] && { echo "${window_of[$pid]}"; return 0; }
-    pid=$(awk '{print $4}' "/proc/$pid/stat" 2>/dev/null)
-    ((hops++))
-  done
-  return 1
-}
+# The awk pass: read every process once, find the agents, and walk each one up
+# to whichever ancestor owns a window, using the parent map already in memory.
+# The process list is piped in rather than handed to awk as filenames. A
+# process can exit between the shell expanding the glob and awk opening it, and
+# gawk treats a missing input file as fatal: one short-lived process anywhere
+# on the machine killed the entire scan. `cat` skips what has vanished and
+# keeps going, which is the only sane behaviour when reading /proc.
+matches=$(cat /proc/[0-9]*/stat 2>/dev/null | awk -v agents="$AGENTS" -v windows="$windows" '
+  BEGIN {
+    split(agents, list, " ")
+    for (i in list) wanted[list[i]] = 1
 
-for name in $AGENTS; do
-  for pid in $(pgrep -x "$name" 2>/dev/null); do
-    address=$(owning_window "$pid") || continue
-    written=$(awk '/^wchar/{print $2}' "/proc/$pid/io" 2>/dev/null) || continue
-    cwd=$(readlink "/proc/$pid/cwd" 2>/dev/null || true)
-    printf '%s %s %s %s %s\n' "$address" "$pid" "${written:-0}" "$name" "${cwd:-}"
-  done
-done
+    split(windows, lines, "\n")
+    for (i in lines) {
+      if (split(lines[i], f, "\t") < 2) continue
+      address[f[1]] = f[2]
+      title[f[1]] = f[3]
+    }
+  }
+  {
+    # Not called open/close: both are awk built-ins, and shadowing them makes
+    # the whole program fail silently under 2>/dev/null.
+    lparen = index($0, "(")
+    rparen = index($0, ") ")
+    if (lparen == 0 || rparen == 0) next
+
+    pid = substr($0, 1, lparen - 2)
+    comm = substr($0, lparen + 1, rparen - lparen - 1)
+    split(substr($0, rparen + 2), rest, " ")
+
+    parent[pid] = rest[2]
+    if (comm in wanted) name[pid] = comm
+  }
+  END {
+    for (pid in name) {
+      up = pid
+      for (hop = 0; hop < 12 && up != "" && up != "1"; hop++) {
+        if (up in address) {
+          # Read straight from /proc rather than spawning an awk per match:
+          # three matches meant three extra processes a scan, every scan.
+          written = 0
+          io = "/proc/" pid "/io"
+          while ((getline line < io) > 0) {
+            if (substr(line, 1, 7) == "wchar: ") { written = substr(line, 8) + 0; break }
+          }
+          close(io)
+
+          print address[up] "\t" pid "\t" written "\t" name[pid] "\t" title[up]
+          break
+        }
+        up = parent[up]
+      }
+    }
+  }
+')
+
+[[ -n $matches ]] || exit 0
+
+# Only the directory still needs a syscall awk cannot make, and only for the
+# handful that matched.
+while IFS=$'\t' read -r window pid written agent title; do
+  cwd=$(readlink "/proc/$pid/cwd" 2>/dev/null || true)
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$window" "$pid" "$written" "$agent" "${cwd:-}" "$title"
+done <<< "$matches"

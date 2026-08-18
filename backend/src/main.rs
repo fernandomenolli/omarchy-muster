@@ -1,0 +1,117 @@
+// Same job as bin/muster-scan, written to be compared against it.
+//
+// Reads every process once, finds the coding agents by name, walks each one up
+// to whichever ancestor owns a window, and reports how many bytes it has
+// written. The window list still comes from hyprctl, which is the one thing
+// that cannot be read straight from /proc.
+
+use std::collections::HashMap;
+use std::fs;
+use std::process::Command;
+
+fn main() {
+    let agents: Vec<String> = std::env::var("MUSTER_AGENTS")
+        .unwrap_or_else(|_| "claude codex gemini aider opencode amp goose crush".into())
+        .split_whitespace()
+        .map(|s| s.to_string())
+        .collect();
+
+    // pid -> (address, title). Hand-rolled rather than pulling in a JSON
+    // crate: the shape here is fixed and the point of this build is to measure
+    // the work, not the dependency tree.
+    let mut windows: HashMap<i32, (String, String)> = HashMap::new();
+    if let Ok(out) = Command::new("hyprctl").args(["-j", "clients"]).output() {
+        let text = String::from_utf8_lossy(&out.stdout);
+        for chunk in text.split("\"address\": \"").skip(1) {
+            let address = match chunk.find('"') {
+                Some(end) => chunk[..end].to_string(),
+                None => continue,
+            };
+            let pid = match after(chunk, "\"pid\": ") {
+                Some(rest) => rest
+                    .chars()
+                    .take_while(|c| c.is_ascii_digit())
+                    .collect::<String>()
+                    .parse::<i32>()
+                    .unwrap_or(0),
+                None => continue,
+            };
+            let title = after(chunk, "\"title\": \"")
+                .and_then(|rest| rest.find('"').map(|end| rest[..end].to_string()))
+                .unwrap_or_default();
+
+            if pid > 0 {
+                windows.insert(pid, (address, title));
+            }
+        }
+    }
+
+    // One pass over /proc: parent map, and which pids are agents.
+    let mut parent: HashMap<i32, i32> = HashMap::new();
+    let mut found: Vec<(i32, String)> = Vec::new();
+
+    let entries = match fs::read_dir("/proc") {
+        Ok(entries) => entries,
+        Err(_) => return,
+    };
+
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        let pid: i32 = match name.parse() {
+            Ok(pid) => pid,
+            Err(_) => continue,
+        };
+
+        // A process can exit while this runs. That is normal and not an error.
+        let stat = match fs::read_to_string(format!("/proc/{pid}/stat")) {
+            Ok(stat) => stat,
+            Err(_) => continue,
+        };
+
+        let (comm, rest) = match (stat.find('('), stat.rfind(')')) {
+            (Some(open), Some(close)) if close > open => {
+                (stat[open + 1..close].to_string(), &stat[close + 2..])
+            }
+            _ => continue,
+        };
+
+        if let Some(ppid) = rest.split_whitespace().nth(1).and_then(|s| s.parse().ok()) {
+            parent.insert(pid, ppid);
+        }
+        if agents.iter().any(|a| *a == comm) {
+            found.push((pid, comm));
+        }
+    }
+
+    for (pid, agent) in found {
+        let mut up = pid;
+        for _ in 0..12 {
+            if let Some((address, title)) = windows.get(&up) {
+                let written = fs::read_to_string(format!("/proc/{pid}/io"))
+                    .ok()
+                    .and_then(|io| {
+                        io.lines()
+                            .find(|l| l.starts_with("wchar:"))
+                            .and_then(|l| l[6..].trim().parse::<u64>().ok())
+                    })
+                    .unwrap_or(0);
+
+                let cwd = fs::read_link(format!("/proc/{pid}/cwd"))
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .unwrap_or_default();
+
+                println!("{address}\t{pid}\t{written}\t{agent}\t{cwd}\t{title}");
+                break;
+            }
+            match parent.get(&up) {
+                Some(&next) if next > 1 => up = next,
+                _ => break,
+            }
+        }
+    }
+}
+
+fn after<'a>(text: &'a str, key: &str) -> Option<&'a str> {
+    text.find(key).map(|at| &text[at + key.len()..])
+}
