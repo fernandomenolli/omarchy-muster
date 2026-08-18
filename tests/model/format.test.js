@@ -30,8 +30,3 @@ test("idle time reads the way someone would say it", () => {
   eq(Format.idleFor(125 * 60000), "2h05")
 })
 
-test("the bar counts what is waiting, and only counts when something is", () => {
-  eq(Format.barLabel([{ working: true }, { working: true }]), "2")
-  eq(Format.barLabel([{ working: true }, { working: false }]), "1/2")
-  eq(Format.barLabel([]), "")
-})

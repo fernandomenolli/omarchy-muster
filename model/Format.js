@@ -27,12 +27,3 @@ function idleFor(ms) {
   return hours + "h" + (rest < 10 ? "0" : "") + rest
 }
 
-// What the bar says. Silence when everything is still working, because a
-// number that never changes stops being read.
-function barLabel(sessions) {
-  var idle = 0
-  for (var i = 0; i < (sessions || []).length; i++) if (!sessions[i].working) idle++
-
-  if ((sessions || []).length === 0) return ""
-  return idle === 0 ? String(sessions.length) : idle + "/" + sessions.length
-}

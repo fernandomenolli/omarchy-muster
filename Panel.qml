@@ -18,7 +18,6 @@ Panel {
 
   readonly property int intervalMs: setting("intervalMs", 3000)
   readonly property int thresholdBytes: setting("thresholdBytes", 1024)
-  readonly property bool notifyOnStop: setting("notifyOnStop", true)
   readonly property bool showWhenEmpty: setting("showWhenEmpty", false)
   readonly property string agents: setting("agents", "claude codex gemini aider opencode amp goose crush")
 
@@ -33,11 +32,6 @@ Panel {
   implicitWidth: button.visible ? button.implicitWidth : 0
   implicitHeight: button.visible ? button.implicitHeight : 0
 
-  function titleOf(address) {
-    return titles[address] || ""
-  }
-
-  property var titles: ({})
 
   function goTo(address) {
     Quickshell.execDetached(["hyprctl", "dispatch",
@@ -49,53 +43,18 @@ Panel {
     id: roll
     intervalMs: root.intervalMs
     thresholdBytes: root.thresholdBytes
-    notifyOnStop: root.notifyOnStop
     agents: root.agents
     scanPath: Qt.resolvedUrl("bin/muster-scan").toString().replace("file://", "")
-
-    // The notification carries the way back with it: clicking it focuses the
-    // terminal that is waiting. Being told without being taken there is half
-    // an answer, and the half that still costs you the context switch.
-    onStopped: function(session) {
-      var name = Format.task(root.titleOf(session.address))
-      var project = Format.project(session.cwd, root.home)
-
-      Quickshell.execDetached(["omarchy-notification-send",
-        "--exec", "hyprctl dispatch \"hl.dsp.focus({ window = \\\"address:" + session.address + "\\\" })\"",
-        "-g", "\udb84\udffa",
-        session.agent + (project === "" ? "" : " · " + project) + " is waiting",
-        name === "" ? "It stopped and is waiting for you" : name])
-    }
   }
 
-  // Window titles come from the shell's own view of Hyprland, so the roll call
-  // never has to shell out for them.
-  Process {
-    id: titleScan
-    command: ["bash", "-c", "hyprctl -j clients | jq -r '.[] | \"\\(.address)\\t\\(.title)\"'"]
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: {
-        var map = {}
-        var lines = String(text).split("\n")
-        for (var i = 0; i < lines.length; i++) {
-          var tab = lines[i].indexOf("\t")
-          if (tab > 0) map[lines[i].slice(0, tab)] = lines[i].slice(tab + 1)
-        }
-        root.titles = map
-      }
-    }
-  }
-
+  // The panel needs the waiting time to grow while it is open; nothing else
+  // here is on a clock.
   Timer {
-    interval: root.intervalMs
-    running: true
+    interval: 5000
+    running: root.opened
     repeat: true
     triggeredOnStart: true
-    onTriggered: {
-      root.now = Date.now()
-      if (!titleScan.running) titleScan.running = true
-    }
+    onTriggered: root.now = Date.now()
   }
 
   IpcHandler {
@@ -114,7 +73,7 @@ Panel {
         if (waiting[i].idleSince < oldest.idleSince) oldest = waiting[i]
       }
       root.goTo(oldest.address)
-      return Format.task(root.titleOf(oldest.address))
+      return Format.task(oldest.title)
     }
   }
 
@@ -123,8 +82,55 @@ Panel {
     anchors.fill: parent
     bar: root.bar
     visible: roll.total > 0 || root.showWhenEmpty
-    text: root.vertical ? "󰄯" : "󰄯 " + Format.barLabel(roll.sessions)
+    // A hand up. An agent that stops is not reporting a status, it is asking
+    // you something, and the gesture for that is the one everybody learned in
+    // a classroom before they learned anything else on this machine.
+    //
+    // It is the bar's own glyph and the bar's own way of turning red, which is
+    // the whole reason it sits in the row rather than on it. Five shapes were
+    // drawn by hand here first, a helmet, chevrons, a rank of marks, a
+    // standard and a terminal prompt, and every one of them was either a
+    // chart, a cliche, or the wrong weight beside its neighbours.
+    //
+    // The number appears only when it has something to say, and then it says
+    // one thing: how many are waiting on you. A count sitting at nought all
+    // day is a dashboard, and a dashboard is a thing you learn to stop seeing.
+    text: ""
+    keepSpace: true
+    hasVisualContent: true
+    fixedWidth: root.vertical ? -1 : content.implicitWidth + Style.space(17)
     active: roll.idleCount > 0
+
+    // Glyph and count as two labels rather than one string, only so the gap
+    // between them can be set. A space in a monospaced font is a whole cell
+    // wide, which pushes the number far enough away to read as a separate
+    // widget.
+    Row {
+      id: content
+      anchors.centerIn: parent
+      spacing: Style.space(3)
+
+      readonly property color tone: button.active ? button.activeColor : button.foreground
+
+      Text {
+        anchors.verticalCenter: parent.verticalCenter
+        text: "󰩏"
+        color: content.tone
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.body
+        Behavior on color { ColorAnimation { duration: 220 } }
+      }
+
+      Text {
+        visible: roll.idleCount > 0
+        anchors.verticalCenter: parent.verticalCenter
+        text: String(roll.idleCount)
+        color: content.tone
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.body
+        Behavior on color { ColorAnimation { duration: 220 } }
+      }
+    }
     tooltipText: roll.total === 0 ? "No agents running"
       : roll.idleCount === 0 ? roll.total + " working"
       : roll.idleCount + " waiting for you"
@@ -134,6 +140,7 @@ Panel {
         root.goTo(waiting[0].address)
       } else root.toggle()
     }
+
   }
 
   KeyboardPanel {
@@ -209,7 +216,7 @@ Panel {
                 implicitHeight: Math.max(Style.space(38), labels.implicitHeight + Style.space(10))
 
                 readonly property bool idle: !modelData.working
-                readonly property string taskText: Format.task(root.titleOf(modelData.address))
+                readonly property string taskText: Format.task(modelData.title)
 
                 Rectangle {
                   anchors.fill: parent

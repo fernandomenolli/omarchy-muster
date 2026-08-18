@@ -6,20 +6,21 @@
   "author": "Fernando Menolli",
   "license": "MIT",
   "description": "The roll call of the coding agents running on this machine: which are working, which are waiting for you, and how long they have been.",
-  "kinds": ["bar-widget"],
+  "kinds": [
+    "bar-widget"
+  ],
   "entryPoints": {
     "barWidget": "Panel.qml"
   },
   "barWidget": {
     "displayName": "Muster",
-    "description": "Run three agents at once and all three terminals are called Alacritty. Muster tells them apart: the task each one is on, whether it is working or sitting there waiting for you, and one click to go to it. It notices the moment one stops, which is the moment that costs you twenty minutes.",
+    "description": "Run three agents at once and all three terminals are called Alacritty. Muster tells them apart: the task each one is on, whether it is working or sitting there waiting for you, and one click to go to it. The bar turns and counts when one stops, which is the moment that costs you twenty minutes.",
     "category": "Developer Tools",
     "allowMultiple": false,
     "defaultSection": "right",
     "defaults": {
       "intervalMs": 3000,
       "thresholdBytes": 1024,
-      "notifyOnStop": true,
       "showWhenEmpty": false,
       "agents": "claude codex gemini aider opencode amp goose crush"
     },
@@ -42,12 +43,6 @@
         "step": 128,
         "defaultValue": 1024,
         "description": "An agent producing output writes tens of thousands of bytes between checks; a terminal merely redrawing writes a few dozen. Anything in that gap works."
-      },
-      {
-        "key": "notifyOnStop",
-        "type": "boolean",
-        "label": "Tell me when an agent stops",
-        "defaultValue": true
       },
       {
         "key": "showWhenEmpty",
