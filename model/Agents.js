@@ -1,16 +1,17 @@
 .pragma library
 
-// One line per running agent, as the scan prints it:
+// One line per running agent, tab separated, as the scan prints it:
 //
-//   0x55896ddddfc0 196814 4768152442 claude /home/fernando/Projects/risecode
+//   0x55896ddddfc0\t196814\t4768152442\tclaude\t/home/fernando/Projects/risecode\t✳ Revisar cards
 //
-// The path is last because a path can contain spaces and nothing else here can.
+// Tabs rather than spaces: a window title is written by whatever program owns
+// the window, and half of them contain spaces.
 function parseScan(text) {
   var sessions = []
   var lines = String(text || "").split("\n")
 
   for (var i = 0; i < lines.length; i++) {
-    var parts = lines[i].trim().split(" ")
+    var parts = lines[i].split("\t")
     if (parts.length < 4) continue
 
     var written = Number(parts[2])
@@ -21,11 +22,24 @@ function parseScan(text) {
       pid: parts[1],
       written: written,
       agent: parts[3],
-      cwd: parts.slice(4).join(" ")
+      cwd: parts[4] || "",
+      title: parts[5] || ""
     })
   }
 
+  // By pid, so the order does not depend on the order the kernel happened to
+  // hand the processes over. The reading below pairs each agent with a file
+  // view by position, and a list that reshuffles between scans pairs them
+  // wrongly.
+  sessions.sort(function(a, b) { return Number(a.pid) - Number(b.pid) })
   return sessions
+}
+
+// Whether two scans found the same agents, regardless of what they are doing.
+function samePids(a, b) {
+  if ((a || []).length !== (b || []).length) return false
+  for (var i = 0; i < a.length; i++) if (a[i].pid !== b[i].pid) return false
+  return true
 }
 
 // An agent producing output is working; one waiting for you writes nothing.
@@ -46,6 +60,7 @@ function classify(previous, scan, thresholdBytes, at) {
       written: session.written,
       agent: session.agent,
       cwd: session.cwd,
+      title: session.title,
       working: working,
       // The moment it stopped, kept across samples so the panel can say how
       // long it has been sitting there. A session that never worked has no
@@ -74,4 +89,15 @@ function justStopped(previous, current) {
   return (current || []).filter(function(session) {
     return !session.working && wasWorking[session.pid] === true
   })
+}
+
+// /proc/<pid>/io, of which one line matters:
+//
+//   wchar: 4768196821
+//
+// Returns -1 rather than zero when the file says nothing, because zero is a
+// real answer meaning the agent has written nothing at all.
+function bytesWritten(text) {
+  var match = String(text || "").match(/^wchar:\s+(\d+)/m)
+  return match ? Number(match[1]) : -1
 }

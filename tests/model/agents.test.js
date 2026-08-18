@@ -2,9 +2,9 @@ const { load, test, eq } = require("../harness.js")
 const Agents = load("Agents.js")
 
 const SCAN = [
-  "0x55896ddddfc0 196814 4768152442 claude /home/fernando/Projects/risecode",
-  "0x55896de6f5a0 253544 290823567 claude /home/fernando/Projects/beep",
-  "0x55896e165cc0 938768 6996894284 codex /home/fernando/Projects/meus arquivos",
+  "0x55896ddddfc0\t196814\t4768152442\tclaude\t/home/fernando/Projects/risecode\t✳ Revisar cards",
+  "0x55896de6f5a0\t253544\t290823567\tclaude\t/home/fernando/Projects/beep\t◑ Implementar canal",
+  "0x55896e165cc0\t938768\t6996894284\tcodex\t/home/fernando/Projects/meus arquivos\tPágina Inicial / X",
 ].join("\n")
 
 test("a scan line is read into a session", () => {
@@ -13,17 +13,22 @@ test("a scan line is read into a session", () => {
     pid: "196814",
     written: 4768152442,
     agent: "claude",
-    cwd: "/home/fernando/Projects/risecode"
+    cwd: "/home/fernando/Projects/risecode",
+    title: "✳ Revisar cards"
   })
 })
 
-test("a path with spaces survives, which is why it comes last", () => {
+test("a path with spaces survives, because the fields are tab separated", () => {
   eq(Agents.parseScan(SCAN)[2].cwd, "/home/fernando/Projects/meus arquivos")
+})
+
+test("a title with spaces and punctuation survives too", () => {
+  eq(Agents.parseScan(SCAN)[2].title, "Página Inicial / X")
 })
 
 test("a line that is not a session is skipped rather than guessed at", () => {
   eq(Agents.parseScan("garbage\n\nnot even close").length, 0)
-  eq(Agents.parseScan("0xzz 1 2 claude /tmp").length, 0)
+  eq(Agents.parseScan("0xzz\t1\t2\tclaude\t/tmp").length, 0)
 })
 
 test("an agent that wrote nothing since last time is waiting for you", () => {
@@ -77,4 +82,43 @@ test("only a session that just stopped is worth interrupting someone for", () =>
 test("a session that was already idle is not announced again", () => {
   const before = [{ pid: "2", working: false }]
   eq(Agents.justStopped(before, [{ pid: "2", working: false }]), [])
+})
+
+test("the byte count is read from the one line of /proc/<pid>/io that matters", () => {
+  eq(Agents.bytesWritten("rchar: 23537624072\nwchar: 4768196821\nsyscr: 6585367\n"), 4768196821)
+})
+
+test("a file that says nothing is not the same as an agent that wrote nothing", () => {
+  eq(Agents.bytesWritten(""), -1)
+  eq(Agents.bytesWritten("rchar: 1\nsyscr: 2\n"), -1)
+  eq(Agents.bytesWritten("wchar: 0\n"), 0)
+})
+
+// The title is what a person reads in the panel, and it is the one field that
+// only exists in the scan: losing it here shows every row as "claude".
+test("classify carries the task through", () => {
+  const scan = [{ pid: "1", address: "0x1", written: 10, agent: "claude",
+                  cwd: "/home/me/atlas", title: "\u2733 Wire the importer" }]
+  const [session] = Agents.classify([], scan, 1024, 1000)
+  eq(session.title, "\u2733 Wire the importer")
+  eq(session.cwd, "/home/me/atlas")
+})
+
+// Two scans of the same machine must agree on the order, because the reading
+// pairs each agent with a file by position.
+test("parseScan orders by pid", () => {
+  const text = [
+    "0x3\t900\t10\tclaude\t/home/me/c\tthird",
+    "0x1\t100\t10\tclaude\t/home/me/a\tfirst",
+    "0x2\t500\t10\tclaude\t/home/me/b\tsecond"
+  ].join("\n")
+
+  eq(Agents.parseScan(text).map(s => s.pid), ["100", "500", "900"])
+})
+
+test("samePids ignores everything but who is there", () => {
+  const before = [{ pid: "1", written: 10 }, { pid: "2", written: 10 }]
+  eq(Agents.samePids(before, [{ pid: "1", written: 99 }, { pid: "2", written: 5 }]), true)
+  eq(Agents.samePids(before, [{ pid: "1" }]), false)
+  eq(Agents.samePids(before, [{ pid: "1" }, { pid: "3" }]), false)
 })
