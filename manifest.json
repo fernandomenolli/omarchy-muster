@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.fernandomenolli.muster",
+  "name": "Muster",
+  "version": "0.1.0",
+  "author": "Fernando Menolli",
+  "license": "MIT",
+  "description": "The roll call of the coding agents running on this machine: which are working, which are waiting for you, and how long they have been.",
+  "kinds": ["bar-widget"],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Muster",
+    "description": "Run three agents at once and all three terminals are called Alacritty. Muster tells them apart: the task each one is on, whether it is working or sitting there waiting for you, and one click to go to it. It notices the moment one stops, which is the moment that costs you twenty minutes.",
+    "category": "Developer Tools",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "intervalMs": 3000,
+      "thresholdBytes": 1024,
+      "notifyOnStop": true,
+      "showWhenEmpty": false,
+      "agents": "claude codex gemini aider opencode amp goose crush"
+    },
+    "schema": [
+      {
+        "key": "intervalMs",
+        "type": "integer",
+        "label": "Check every (ms)",
+        "min": 1000,
+        "max": 30000,
+        "step": 500,
+        "defaultValue": 3000
+      },
+      {
+        "key": "thresholdBytes",
+        "type": "integer",
+        "label": "Bytes written that count as working",
+        "min": 128,
+        "max": 65536,
+        "step": 128,
+        "defaultValue": 1024,
+        "description": "An agent producing output writes tens of thousands of bytes between checks; a terminal merely redrawing writes a few dozen. Anything in that gap works."
+      },
+      {
+        "key": "notifyOnStop",
+        "type": "boolean",
+        "label": "Tell me when an agent stops",
+        "defaultValue": true
+      },
+      {
+        "key": "showWhenEmpty",
+        "type": "boolean",
+        "label": "Keep the icon in the bar with no agents running",
+        "defaultValue": false
+      },
+      {
+        "key": "agents",
+        "type": "string",
+        "label": "Process names to watch",
+        "defaultValue": "claude codex gemini aider opencode amp goose crush",
+        "description": "Separated by spaces. Anything that runs in a terminal and writes as it works belongs here."
+      }
+    ]
+  }
+}

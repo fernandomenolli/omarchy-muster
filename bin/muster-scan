@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Lists the coding agents running on this machine, one per line:
+#
+#   <window-address> <agent-pid> <bytes-written> <agent> <cwd>
+#
+# An agent is found by walking up from its process to whichever ancestor owns a
+# window, so it does not matter how deeply the terminal nests it: a shell, a
+# multiplexer, a wrapper script.
+#
+# Bytes written is the state signal. An agent producing output is working; one
+# waiting for you writes nothing. Measured here, differences ran three orders
+# of magnitude: twenty thousand bytes against sixty.
+
+set -uo pipefail
+
+AGENTS="${MUSTER_AGENTS:-claude codex gemini aider opencode amp goose crush}"
+
+command -v hyprctl >/dev/null || exit 0
+command -v jq >/dev/null || exit 0
+
+# pid -> window address, for every window on the machine
+declare -A window_of
+while IFS=$'\t' read -r pid address; do
+  [[ -n $pid ]] && window_of[$pid]="$address"
+done < <(hyprctl -j clients | jq -r '.[] | "\(.pid)\t\(.address)"')
+
+owning_window() {
+  local pid="$1" hops=0
+  while [[ -n $pid && $pid != 1 && $hops -lt 12 ]]; do
+    [[ -n ${window_of[$pid]:-} ]] && { echo "${window_of[$pid]}"; return 0; }
+    pid=$(awk '{print $4}' "/proc/$pid/stat" 2>/dev/null)
+    ((hops++))
+  done
+  return 1
+}
+
+for name in $AGENTS; do
+  for pid in $(pgrep -x "$name" 2>/dev/null); do
+    address=$(owning_window "$pid") || continue
+    written=$(awk '/^wchar/{print $2}' "/proc/$pid/io" 2>/dev/null) || continue
+    cwd=$(readlink "/proc/$pid/cwd" 2>/dev/null || true)
+    printf '%s %s %s %s %s\n' "$address" "$pid" "${written:-0}" "$name" "${cwd:-}"
+  done
+done
