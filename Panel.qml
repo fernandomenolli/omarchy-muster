@@ -86,11 +86,11 @@ Panel {
     // you something, and the gesture for that is the one everybody learned in
     // a classroom before they learned anything else on this machine.
     //
-    // It is the bar's own glyph and the bar's own way of turning red, which is
-    // the whole reason it sits in the row rather than on it. Five shapes were
-    // drawn by hand here first, a helmet, chevrons, a rank of marks, a
-    // standard and a terminal prompt, and every one of them was either a
-    // chart, a cliche, or the wrong weight beside its neighbours.
+    // It is the bar's own glyph, which is the whole reason it sits in the row
+    // rather than on it. Five shapes were drawn by hand here first, a helmet,
+    // chevrons, a rank of marks, a standard and a terminal prompt, and every
+    // one of them was either a chart, a cliche, or the wrong weight beside its
+    // neighbours.
     //
     // The number appears only when it has something to say, and then it says
     // one thing: how many are waiting on you. A count sitting at nought all
@@ -99,7 +99,6 @@ Panel {
     keepSpace: true
     hasVisualContent: true
     fixedWidth: root.vertical ? -1 : content.implicitWidth + Style.space(17)
-    active: roll.idleCount > 0
 
     // Glyph and count as two labels rather than one string, only so the gap
     // between them can be set. A space in a monospaced font is a whole cell
@@ -110,11 +109,14 @@ Panel {
       anchors.centerIn: parent
       spacing: Style.space(3)
 
-      readonly property color tone: button.active ? button.activeColor : button.foreground
+      // One colour, always. Red is what this bar uses for something being the
+      // matter, and an agent finishing its turn is not that: it is the ordinary
+      // end of a piece of work. The weight of the mark carries it instead.
+      readonly property color tone: button.foreground
 
       Text {
         anchors.verticalCenter: parent.verticalCenter
-        text: "󰩏"
+        text: roll.idleCount > 0 ? "󰩏" : "󱠯"
         color: content.tone
         font.family: root.fontFamily
         font.pixelSize: Style.font.body

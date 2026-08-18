@@ -41,9 +41,12 @@ It writes nothing outside its own directory.
 
 A hand up. An agent that stops is not reporting a status, it is asking you
 something, and the gesture for that is the one everybody learned in a classroom
-before they learned anything else on this machine. It sits quiet and grey while
-everything is running, and turns the colour every widget in this bar turns when
-it wants you.
+before they learned anything else on this machine. It is an outline while
+everything is running and fills in when someone is waiting on you.
+
+Weight rather than colour, deliberately. Red in this bar means something is the
+matter, and an agent finishing its turn is not that: it is the ordinary end of
+a piece of work.
 
 The number beside it only appears when it has something to say, and then it
 says one thing: how many agents are waiting on you. A count sitting at nought
