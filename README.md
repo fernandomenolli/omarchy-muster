@@ -101,6 +101,12 @@ multiplexer, a wrapper script.
 identical from outside: the process stopped writing. What it reports is how
 long it has been quiet, which is the part that makes you go and look.
 
+**The agent has to do its own writing.** The signal is what the agent process
+itself sends to the terminal, so a wrapper that hands the output to a child
+process to print leaves the agent looking permanently quiet. Every agent that
+ships as a terminal program writes its own output, which is why the list of
+known ones works, but it is worth knowing before adding something unusual.
+
 **It is not a usage meter.** There are eight of those in the catalogue already.
 This one is about work, not spend.
 
