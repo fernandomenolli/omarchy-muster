@@ -27,6 +27,19 @@ function parseScan(text) {
     })
   }
 
+  // One entry per window. The scan already drops an agent whose parent is an
+  // agent, and this is the same rule kept here so the panel cannot show two
+  // rows that both take you to the same terminal: a person goes to a window,
+  // not to a process.
+  var byWindow = {}
+  var unique = []
+  for (var j = 0; j < sessions.length; j++) {
+    if (byWindow[sessions[j].address]) continue
+    byWindow[sessions[j].address] = true
+    unique.push(sessions[j])
+  }
+  sessions = unique
+
   // By pid, so the order does not depend on the order the kernel happened to
   // hand the processes over. The reading below pairs each agent with a file
   // view by position, and a list that reshuffles between scans pairs them

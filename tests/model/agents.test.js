@@ -122,3 +122,18 @@ test("samePids ignores everything but who is there", () => {
   eq(Agents.samePids(before, [{ pid: "1" }]), false)
   eq(Agents.samePids(before, [{ pid: "1" }, { pid: "3" }]), false)
 })
+
+// An agent that launches an agent shares its terminal. Two rows for one window
+// is a roll call with a member nobody can go and talk to, and the child never
+// writes to the terminal so it is always the one that looks asleep.
+test("parseScan keeps one session per window", () => {
+  const text = [
+    "0x1\t100\t500\tclaude\t/home/me/atlas\tthe task",
+    "0x1\t900\t0\tclaude\t/home/me/atlas\tthe task",
+    "0x2\t300\t500\tclaude\t/home/me/ledger\tanother"
+  ].join("\n")
+
+  const sessions = Agents.parseScan(text)
+  eq(sessions.map(s => s.address), ["0x1", "0x2"])
+  eq(sessions.map(s => s.pid), ["100", "300"])
+})

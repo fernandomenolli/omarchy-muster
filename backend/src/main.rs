@@ -84,9 +84,21 @@ fn main() {
         }
     }
 
-    for (pid, agent) in found {
+    let matched: std::collections::HashSet<i32> = found.iter().map(|(pid, _)| *pid).collect();
+
+    for (pid, agent) in &found {
+        let (pid, agent) = (*pid, agent);
         let mut up = pid;
         for _ in 0..12 {
+            // An agent that launches an agent is one session, not two. The
+            // child writes to a pipe its parent reads rather than to the
+            // terminal, so it always looks asleep, and the roll call gains a
+            // member nobody can go and talk to. Whichever one owns the window
+            // reports; the rest are it.
+            if up != pid && matched.contains(&up) {
+                break;
+            }
+
             if let Some((address, title)) = windows.get(&up) {
                 let written = fs::read_to_string(format!("/proc/{pid}/io"))
                     .ok()
