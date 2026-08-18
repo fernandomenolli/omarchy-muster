@@ -33,6 +33,22 @@ omarchy plugin remove io.github.fernandomenolli.muster
 
 It writes nothing outside its own directory.
 
+## In the bar
+
+![The hand, and the count when there is one.](docs/bar.png)
+
+*The hand, and the count when there is one.*
+
+A hand up. An agent that stops is not reporting a status, it is asking you
+something, and the gesture for that is the one everybody learned in a classroom
+before they learned anything else on this machine. It sits quiet and grey while
+everything is running, and turns the colour every widget in this bar turns when
+it wants you.
+
+The number beside it only appears when it has something to say, and then it
+says one thing: how many agents are waiting on you. A count sitting at nought
+all day is a dashboard, and a dashboard is a thing you learn to stop seeing.
+
 ## How it knows
 
 An agent producing output writes to its terminal. One waiting for you writes
@@ -69,9 +85,6 @@ o.bind("SUPER + A", "Next waiting agent",
   "omarchy-shell io.github.fernandomenolli.muster next")
 ```
 
-When an agent stops, a notification says which one, and clicking it takes you
-there. Being told without being taken is half an answer.
-
 ## Any agent, not just one
 
 It watches process names, and ships knowing `claude`, `codex`, `gemini`,
@@ -97,9 +110,50 @@ This one is about work, not spend.
 |---|---|---|
 | Check every | 3000 ms | |
 | Bytes that count as working | 1024 | the gap it straddles is enormous, so this is not delicate |
-| Tell me when an agent stops | on | |
 | Keep the icon with no agents | off | otherwise it only appears when there is something to say |
 | Process names to watch | eight known agents | space separated |
+
+## What it costs
+
+Measured on the machine this was built on, an AMD box with 24 cores running
+Omarchy 4.0.0.alpha and Hyprland 0.56.2, with three agents running. The method
+is to read `utime + stime` from `/proc/<pid>/stat` for the shell process, with
+the plugin enabled and then disabled, and take the difference.
+
+| | Shell alone | With this plugin |
+|---|---|---|
+| One minute, three agents running | 115 ms of CPU | 165 ms |
+| Memory | ~500 MB | no measurable change |
+
+Fifty milliseconds a minute, which is eight hundredths of one percent of one
+core.
+
+**It does not get heavier as it runs.** The work in a cycle is one file read
+per agent, so it is set by how many agents you have and not by how long the
+session has been open. The expensive half, finding the agents at all, runs
+twice a minute and when a window opens or closes, rather than on every check.
+
+## The scan
+
+Finding the agents means walking every process on the machine, matching the
+ones you asked for, climbing each match's ancestors until one of them owns a
+window, and resolving that process's directory. That is `bin/muster-scan`, and
+reading it is the way to know exactly what this plugin looks at.
+
+A compiled version of the same scan ships under `backend/` for the
+architectures there is a build for, and the script hands over to it when it
+finds one. Neither depends on the other: with no binary present the script does
+the work itself, and it is also the readable definition of what the binary
+does.
+
+```
+bash + awk + jq + hyprctl    15.7 ms
+rust + hyprctl                8.3 ms
+hyprctl alone, paid by both   3.0 ms
+```
+
+Twice a minute, so the difference is fourteen milliseconds a minute. It is
+there because it costs nothing to keep, not because the plugin needed it.
 
 ## Tests
 
