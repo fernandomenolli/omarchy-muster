@@ -70,7 +70,15 @@ function samePids(a, b) {
 // version drew the line at a thousand bytes a check, which put the line above
 // that band, and a session that was busy and quiet was reported as one waiting
 // on you.
-function classify(previous, scan, bytesPerSecond, at) {
+// What a remembered waiting time is filed under. The pid alone would be
+// enough almost always and wrong the once: pids come round again. The window
+// address is the other half, and a shell restarting does not disturb it,
+// which is the whole case this is for.
+function rememberedKey(session) {
+  return String(session.pid) + ":" + String(session.address)
+}
+
+function classify(previous, scan, bytesPerSecond, at, remembered) {
   var byPid = {}
   for (var i = 0; i < (previous || []).length; i++) byPid[previous[i].pid] = previous[i]
 
@@ -78,7 +86,11 @@ function classify(previous, scan, bytesPerSecond, at) {
     var before = byPid[session.pid]
     var seconds = before && before.sampledAt ? (at - before.sampledAt) / 1000 : 0
     var rate = seconds > 0 ? (session.written - before.written) / seconds : 0
-    var working = !before || seconds <= 0 || rate >= bytesPerSecond
+    // Nothing is known until two samples apart have been taken, and an agent
+    // nobody has measured yet gets the benefit of the doubt.
+    var measured = seconds > 0
+    var working = !measured || rate >= bytesPerSecond
+    var recalled = remembered ? remembered[rememberedKey(session)] : 0
 
     return {
       address: session.address,
@@ -92,7 +104,11 @@ function classify(previous, scan, bytesPerSecond, at) {
       // The moment it stopped, kept across samples so the panel can say how
       // long it has been sitting there. A session that never worked has no
       // such moment and is not owed one.
-      idleSince: working ? 0 : (before && before.idleSince ? before.idleSince : at)
+      // The moment it stopped. Kept across samples, and across a restart of
+      // the shell: a session that has been waiting forty minutes has been
+      // waiting forty minutes, whatever happened to the thing watching it.
+      idleSince: working ? 0
+        : (before && before.idleSince ? before.idleSince : (recalled || at))
     }
   })
 }
@@ -127,4 +143,14 @@ function justStopped(previous, current) {
 function bytesWritten(text) {
   var match = String(text || "").match(/^wchar:\s+(\d+)/m)
   return match ? Number(match[1]) : -1
+}
+
+// What is worth writing down: who is waiting and since when. Comparing this
+// against the last one written is what keeps the file from being rewritten
+// every three seconds for no reason.
+function waitingSignature(sessions) {
+  return waiting(sessions)
+    .map(function(session) { return rememberedKey(session) + "@" + session.idleSince })
+    .sort()
+    .join("|")
 }

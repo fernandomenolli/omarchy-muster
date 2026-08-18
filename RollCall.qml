@@ -32,6 +32,18 @@ Item {
   property var found: []
   property var sessions: []
 
+  // Waiting times survive the shell restarting. The question this widget
+  // answers is how long an agent has been sitting there, and that has nothing
+  // to do with how long the thing watching it has been up: a restart used to
+  // reset every answer to "just now".
+  //
+  // Filed by pid and window address together, so a pid that comes round again
+  // under a different window does not inherit a stranger's clock.
+  property var remembered: ({})
+  property bool recalling: true
+  property int reads: 0
+  property string savedSignature: ""
+
   readonly property int total: sessions.length
   readonly property int idleCount: Agents.waiting(sessions).length
 
@@ -91,7 +103,62 @@ Item {
       })
     }
 
-    sessions = Agents.classify(sessions, scan, bytesPerSecond, Date.now())
+    var at = Date.now()
+    sessions = Agents.classify(sessions, scan, bytesPerSecond, at, recalling ? remembered : null)
+
+    // Nothing is measured until two samples apart have been taken, so the
+    // note from last time is what answers the first real question and is then
+    // spent: past that the sessions carry their own clocks, and an old note
+    // could only overwrite a newer truth.
+    reads++
+    if (reads > 2) recalling = false
+
+    // Only when the answer changes. Restarting the timer on every sample, and
+    // sampling more often than the timer waits, means it never fires at all.
+    var signature = Agents.waitingSignature(sessions)
+    if (signature !== savedSignature) {
+      savedSignature = signature
+      saveSoon.restart()
+    }
+  }
+
+  // One small file, written a few seconds after the answer changes rather than
+  // on every sample. Nothing reads it but the next start of the shell.
+  function save() {
+    var out = {}
+    for (var i = 0; i < sessions.length; i++) {
+      if (sessions[i].working || !sessions[i].idleSince) continue
+      out[Agents.rememberedKey(sessions[i])] = sessions[i].idleSince
+    }
+    store.setText(JSON.stringify({ version: 1, waiting: out }))
+  }
+
+  Timer {
+    id: saveSoon
+    interval: 4000
+    repeat: false
+    onTriggered: root.save()
+  }
+
+  FileView {
+    id: store
+    path: Quickshell.env("XDG_STATE_HOME") !== ""
+      ? Quickshell.env("XDG_STATE_HOME") + "/omarchy/plugins/io.github.fernandomenolli.muster/waiting.json"
+      : Quickshell.env("HOME") + "/.local/state/omarchy/plugins/io.github.fernandomenolli.muster/waiting.json"
+    blockLoading: true
+    watchChanges: false
+    printErrors: false
+    atomicWrites: true
+    preload: true
+
+    onLoaded: {
+      try {
+        var parsed = JSON.parse(text())
+        root.remembered = (parsed && parsed.waiting) || ({})
+      } catch (e) {
+        root.remembered = ({})
+      }
+    }
   }
 
   Instantiator {

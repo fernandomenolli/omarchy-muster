@@ -29,9 +29,11 @@ Needs Omarchy 4, Hyprland, and `jq`.
 
 ```bash
 omarchy plugin remove io.github.fernandomenolli.muster
+rm -rf ~/.local/state/omarchy/plugins/io.github.fernandomenolli.muster
 ```
 
-It writes nothing outside its own directory.
+That second line is one small file: the moment each waiting agent stopped, so
+the answer survives the shell restarting. Nothing else is written anywhere.
 
 ## In the bar
 
@@ -110,6 +112,12 @@ owns one, so it does not matter how deeply your setup nests it: a shell, a
 multiplexer, a wrapper script.
 
 ## What it does not do
+
+**The clock is not reset by the shell.** How long an agent has been waiting
+has nothing to do with how long the thing watching it has been up, so the
+moments are kept in `~/.local/state/` and taken back when the shell starts.
+A session is recognised by its process and its window together, so a pid that
+comes round again under a different window does not inherit a stranger's clock.
 
 **It cannot tell "finished" from "asking you a question".** Both look
 identical from outside: the process stopped writing. What it reports is how

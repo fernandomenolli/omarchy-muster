@@ -154,3 +154,42 @@ test("a session waiting on you is not", () => {
   const blinking = Agents.parseScan(SCAN).map(s => ({ ...s, written: s.written + 32 }))
   eq(Agents.classify(first, blinking, 45, 5000).map(s => s.working), [false, false, false])
 })
+
+// A shell restart is not an agent doing anything, so it must not reset the
+// answer to how long that agent has been waiting.
+test("classify takes back a remembered waiting time", () => {
+  const scan = Agents.parseScan(SCAN)
+  const key = Agents.rememberedKey(scan[0])
+  const remembered = {}
+  remembered[key] = 1000
+
+  // Two samples, because nothing is known from one: the first gives the
+  // benefit of the doubt, the second is the first real measurement.
+  const first = Agents.classify([], scan, 45, 500000, remembered)
+  eq(first[0].working, true)
+
+  const second = Agents.classify(first, scan, 45, 504000, remembered)
+  eq(second[0].working, false)
+  eq(second[0].idleSince, 1000)
+})
+
+test("a session nobody remembers starts its clock now", () => {
+  const scan = Agents.parseScan(SCAN)
+  const first = Agents.classify([], scan, 45, 500000, {})
+  eq(Agents.classify(first, scan, 45, 504000, {})[0].idleSince, 504000)
+})
+
+test("the key is the pid and the window, not the pid alone", () => {
+  const [a, b] = Agents.parseScan(SCAN)
+  eq(Agents.rememberedKey(a) === Agents.rememberedKey(b), false)
+  eq(Agents.rememberedKey({ pid: "7", address: "0x1" }), "7:0x1")
+})
+
+test("waitingSignature changes only when the waiting does", () => {
+  const a = [{ pid: "1", address: "0x1", working: false, idleSince: 100 }]
+  const b = [{ pid: "1", address: "0x1", working: false, idleSince: 100 }]
+  const c = [{ pid: "1", address: "0x1", working: false, idleSince: 900 }]
+  eq(Agents.waitingSignature(a), Agents.waitingSignature(b))
+  eq(Agents.waitingSignature(a) === Agents.waitingSignature(c), false)
+  eq(Agents.waitingSignature([{ pid: "1", address: "0x1", working: true }]), "")
+})
