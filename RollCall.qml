@@ -21,7 +21,7 @@ Item {
 
   property int intervalMs: 3000
   property int discoverEveryMs: 30000
-  property int thresholdBytes: 1024
+  property int bytesPerSecond: 45
   property string scanPath: ""
   // Whichever implementation this machine has, asked for once. Going through
   // the script every scan means paying for a bash startup to be told the same
@@ -91,7 +91,7 @@ Item {
       })
     }
 
-    sessions = Agents.classify(sessions, scan, thresholdBytes, Date.now())
+    sessions = Agents.classify(sessions, scan, bytesPerSecond, Date.now())
   }
 
   Instantiator {

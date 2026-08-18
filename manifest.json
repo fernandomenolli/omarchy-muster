@@ -20,9 +20,9 @@
     "defaultSection": "right",
     "defaults": {
       "intervalMs": 3000,
-      "thresholdBytes": 1024,
       "showWhenEmpty": false,
-      "agents": "claude codex gemini aider opencode amp goose crush"
+      "agents": "claude codex gemini aider opencode amp goose crush",
+      "bytesPerSecond": 45
     },
     "schema": [
       {
@@ -35,14 +35,14 @@
         "defaultValue": 3000
       },
       {
-        "key": "thresholdBytes",
+        "key": "bytesPerSecond",
         "type": "integer",
-        "label": "Bytes written that count as working",
-        "min": 128,
-        "max": 65536,
-        "step": 128,
-        "defaultValue": 1024,
-        "description": "An agent producing output writes tens of thousands of bytes between checks; a terminal merely redrawing writes a few dozen. Anything in that gap works."
+        "label": "Bytes a second that count as working",
+        "min": 8,
+        "max": 4096,
+        "step": 5,
+        "defaultValue": 45,
+        "description": "Measured on a real desktop: a session waiting on you writes about 8 bytes a second, one that is busy but silent about 100, and one producing output 700 or more. The default sits in the first gap."
       },
       {
         "key": "showWhenEmpty",

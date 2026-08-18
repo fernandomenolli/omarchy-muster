@@ -56,21 +56,35 @@ function samePids(a, b) {
 }
 
 // An agent producing output is working; one waiting for you writes nothing.
-// The threshold is in bytes per sample, and the gap it has to straddle is
-// enormous: twenty thousand bytes against sixty, measured on a real desktop.
-// Anything in between is a terminal redrawing itself, which is not work.
-function classify(previous, scan, thresholdBytes, at) {
+//
+// The rate is what matters, not the amount, because the gap between the two
+// is measured in bytes a second and the checking interval is a setting. The
+// three states, measured on a real desktop:
+//
+//   waiting for you        8 bytes a second, which is a cursor blinking
+//   busy and silent      100 bytes a second, a spinner and a clock, no output
+//   producing output     700 bytes a second and up
+//
+// A session waiting on a background agent of its own sits in the middle band:
+// it is not asking you for anything, so it counts as working. The first
+// version drew the line at a thousand bytes a check, which put the line above
+// that band, and a session that was busy and quiet was reported as one waiting
+// on you.
+function classify(previous, scan, bytesPerSecond, at) {
   var byPid = {}
   for (var i = 0; i < (previous || []).length; i++) byPid[previous[i].pid] = previous[i]
 
   return (scan || []).map(function(session) {
     var before = byPid[session.pid]
-    var working = !before || (session.written - before.written) >= thresholdBytes
+    var seconds = before && before.sampledAt ? (at - before.sampledAt) / 1000 : 0
+    var rate = seconds > 0 ? (session.written - before.written) / seconds : 0
+    var working = !before || seconds <= 0 || rate >= bytesPerSecond
 
     return {
       address: session.address,
       pid: session.pid,
       written: session.written,
+      sampledAt: at,
       agent: session.agent,
       cwd: session.cwd,
       title: session.title,

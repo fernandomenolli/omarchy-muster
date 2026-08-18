@@ -17,7 +17,7 @@ Panel {
   manageIpc: false
 
   readonly property int intervalMs: setting("intervalMs", 3000)
-  readonly property int thresholdBytes: setting("thresholdBytes", 1024)
+  readonly property int bytesPerSecond: setting("bytesPerSecond", 45)
   readonly property bool showWhenEmpty: setting("showWhenEmpty", false)
   readonly property string agents: setting("agents", "claude codex gemini aider opencode amp goose crush")
 
@@ -42,7 +42,7 @@ Panel {
   RollCall {
     id: roll
     intervalMs: root.intervalMs
-    thresholdBytes: root.thresholdBytes
+    bytesPerSecond: root.bytesPerSecond
     agents: root.agents
     scanPath: Qt.resolvedUrl("bin/muster-scan").toString().replace("file://", "")
   }

@@ -55,19 +55,30 @@ all day is a dashboard, and a dashboard is a thing you learn to stop seeing.
 ## How it knows
 
 An agent producing output writes to its terminal. One waiting for you writes
-nothing. That is the whole signal, read from `wchar` in `/proc/<pid>/io`.
+almost nothing. That is the whole signal, read from `wchar` in
+`/proc/<pid>/io` and taken as a rate.
 
-Measured on a real desktop with three sessions running, over eight seconds:
+There are three states, not two, and the middle one is what makes this
+delicate. Measured on a real desktop:
 
 ```
-working    20598 bytes
-waiting       96 bytes
-waiting       64 bytes
+waiting for you          8 bytes a second     a cursor blinking at a prompt
+busy and silent        100 bytes a second     a spinner and a clock, no output
+producing output       700 bytes a second     and up, often far up
 ```
 
-Three orders of magnitude. CPU time was tried first and is far worse: a
-terminal user interface redraws whether or not anything is happening, so the
-three sessions burned similar CPU while two of them were doing nothing at all.
+A session waiting on a background agent of its own sits in that middle band.
+It is busy, and it is not asking you for anything, so it counts as working.
+The line is drawn at 45 bytes a second, in the gap below it.
+
+This is the part worth knowing before you trust it: the gap between waiting
+and busy-but-silent is about twelvefold, not the three orders of magnitude the
+extremes suggest. A rate rather than an amount per check, so that changing how
+often it looks does not quietly change what it decides.
+
+CPU time was tried first and is far worse: a terminal user interface redraws
+whether or not anything is happening, so three sessions burned similar CPU
+while two of them were doing nothing at all.
 
 Nothing depends on the mark an agent draws in its title. Those are theirs, and
 they change between versions.
@@ -118,7 +129,7 @@ This one is about work, not spend.
 | Setting | Default | What it does |
 |---|---|---|
 | Check every | 3000 ms | |
-| Bytes that count as working | 1024 | the gap it straddles is enormous, so this is not delicate |
+| Bytes a second that count as working | 45 | sits in the gap between a blinking cursor and a spinning one |
 | Keep the icon with no agents | off | otherwise it only appears when there is something to say |
 | Process names to watch | eight known agents | space separated |
 

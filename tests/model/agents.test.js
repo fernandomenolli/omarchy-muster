@@ -32,39 +32,39 @@ test("a line that is not a session is skipped rather than guessed at", () => {
 })
 
 test("an agent that wrote nothing since last time is waiting for you", () => {
-  const before = Agents.classify([], Agents.parseScan(SCAN), 1024, 1000)
-  const same = Agents.classify(before, Agents.parseScan(SCAN), 1024, 5000)
+  const before = Agents.classify([], Agents.parseScan(SCAN), 45, 1000)
+  const same = Agents.classify(before, Agents.parseScan(SCAN), 45, 5000)
   eq(same.map(s => s.working), [false, false, false])
 })
 
 test("an agent that wrote past the threshold is working", () => {
-  const before = Agents.classify([], Agents.parseScan(SCAN), 1024, 1000)
+  const before = Agents.classify([], Agents.parseScan(SCAN), 45, 1000)
   const later = Agents.parseScan(SCAN).map(s => ({ ...s, written: s.written + 20000 }))
-  eq(Agents.classify(before, later, 1024, 5000).map(s => s.working), [true, true, true])
+  eq(Agents.classify(before, later, 45, 5000).map(s => s.working), [true, true, true])
 })
 
 test("a terminal redrawing itself is not work", () => {
-  const before = Agents.classify([], Agents.parseScan(SCAN), 1024, 1000)
+  const before = Agents.classify([], Agents.parseScan(SCAN), 45, 1000)
   const later = Agents.parseScan(SCAN).map(s => ({ ...s, written: s.written + 96 }))
-  eq(Agents.classify(before, later, 1024, 5000)[0].working, false)
+  eq(Agents.classify(before, later, 45, 5000)[0].working, false)
 })
 
 test("a session seen for the first time is given the benefit of the doubt", () => {
-  eq(Agents.classify([], Agents.parseScan(SCAN), 1024, 1000)[0].working, true)
+  eq(Agents.classify([], Agents.parseScan(SCAN), 45, 1000)[0].working, true)
 })
 
 test("the moment it stopped is kept, not restamped on every sample", () => {
-  const first = Agents.classify([], Agents.parseScan(SCAN), 1024, 1000)
-  const stopped = Agents.classify(first, Agents.parseScan(SCAN), 1024, 5000)
-  const later = Agents.classify(stopped, Agents.parseScan(SCAN), 1024, 90000)
+  const first = Agents.classify([], Agents.parseScan(SCAN), 45, 1000)
+  const stopped = Agents.classify(first, Agents.parseScan(SCAN), 45, 5000)
+  const later = Agents.classify(stopped, Agents.parseScan(SCAN), 45, 90000)
   eq(later[0].idleSince, 5000)
 })
 
 test("going back to work clears the moment it stopped", () => {
-  const first = Agents.classify([], Agents.parseScan(SCAN), 1024, 1000)
-  const stopped = Agents.classify(first, Agents.parseScan(SCAN), 1024, 5000)
+  const first = Agents.classify([], Agents.parseScan(SCAN), 45, 1000)
+  const stopped = Agents.classify(first, Agents.parseScan(SCAN), 45, 5000)
   const busy = Agents.parseScan(SCAN).map(s => ({ ...s, written: s.written + 50000 }))
-  eq(Agents.classify(stopped, busy, 1024, 9000)[0].idleSince, 0)
+  eq(Agents.classify(stopped, busy, 45, 9000)[0].idleSince, 0)
 })
 
 test("waiting and working split the roll call", () => {
@@ -99,7 +99,7 @@ test("a file that says nothing is not the same as an agent that wrote nothing", 
 test("classify carries the task through", () => {
   const scan = [{ pid: "1", address: "0x1", written: 10, agent: "claude",
                   cwd: "/home/me/atlas", title: "\u2733 Wire the importer" }]
-  const [session] = Agents.classify([], scan, 1024, 1000)
+  const [session] = Agents.classify([], scan, 45, 1000)
   eq(session.title, "\u2733 Wire the importer")
   eq(session.cwd, "/home/me/atlas")
 })
@@ -136,4 +136,21 @@ test("parseScan keeps one session per window", () => {
   const sessions = Agents.parseScan(text)
   eq(sessions.map(s => s.address), ["0x1", "0x2"])
   eq(sessions.map(s => s.pid), ["100", "300"])
+})
+
+// The band the first version got wrong. A session waiting on a background
+// agent of its own draws a spinner and a clock and nothing else: about a
+// hundred bytes a second, measured. It is busy, and it is not asking you for
+// anything, so it is working.
+test("a session that is busy and silent is working", () => {
+  const first = Agents.classify([], Agents.parseScan(SCAN), 45, 1000)
+  const spinner = Agents.parseScan(SCAN).map(s => ({ ...s, written: s.written + 400 }))
+  eq(Agents.classify(first, spinner, 45, 5000).map(s => s.working), [true, true, true])
+})
+
+// And the one below it, which is a cursor blinking at a prompt.
+test("a session waiting on you is not", () => {
+  const first = Agents.classify([], Agents.parseScan(SCAN), 45, 1000)
+  const blinking = Agents.parseScan(SCAN).map(s => ({ ...s, written: s.written + 32 }))
+  eq(Agents.classify(first, blinking, 45, 5000).map(s => s.working), [false, false, false])
 })
