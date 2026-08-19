@@ -78,7 +78,7 @@ function rememberedKey(session) {
   return String(session.pid) + ":" + String(session.address)
 }
 
-function classify(previous, scan, bytesPerSecond, at, remembered, marks) {
+function classify(previous, scan, bytesPerSecond, at, remembered, marks, patience) {
   var byPid = {}
   for (var i = 0; i < (previous || []).length; i++) byPid[previous[i].pid] = previous[i]
 
@@ -95,16 +95,31 @@ function classify(previous, scan, bytesPerSecond, at, remembered, marks) {
     // stale mark should not be able to hold a busy agent in the waiting
     // column forever.
     var mark = marks ? marks[session.pid] : null
-    var working = !measured || rate >= bytesPerSecond
-    if (mark && mark.working) working = true
+    // One quiet sample is not a stopped agent. A session waiting on work of
+    // its own goes quiet in bursts, and reporting it the first time it does is
+    // how three busy agents get announced as three idle ones. It has to stay
+    // quiet: three samples, about ten seconds, before it counts.
+    //
+    // The clock still starts at the first quiet sample, so nobody is told an
+    // agent has been waiting ten seconds less than it has.
     var recalled = remembered ? remembered[rememberedKey(session)] : 0
+    var wait = patience || 3
+    var below = measured && rate < bytesPerSecond
+    var quiet = below ? ((before && before.quiet) || 0) + 1 : 0
+    var quietSince = !below ? 0 : (before && before.quietSince ? before.quietSince : at)
 
+    var working = true
+    if (mark && mark.working) working = true
+    else if (mark && below) working = false
+    else if (below && quiet >= wait) working = false
 
     return {
       address: session.address,
       pid: session.pid,
       written: session.written,
       sampledAt: at,
+      quiet: quiet,
+      quietSince: quietSince,
       agent: session.agent,
       cwd: session.cwd,
       title: session.title,
@@ -119,7 +134,8 @@ function classify(previous, scan, bytesPerSecond, at, remembered, marks) {
       // sampling is only close.
       idleSince: working ? 0
         : (mark && mark.at ? mark.at
-          : (before && before.idleSince ? before.idleSince : (recalled || at)))
+          : (before && before.idleSince ? before.idleSince
+            : (recalled || quietSince || at)))
     }
   })
 }

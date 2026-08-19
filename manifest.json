@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.fernandomenolli.muster",
   "name": "Muster",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "author": "Fernando Menolli",
   "license": "MIT",
   "description": "The roll call of the coding agents running on this machine: which are working, which are waiting for you, and how long they have been.",

@@ -31,10 +31,31 @@ test("a line that is not a session is skipped rather than guessed at", () => {
   eq(Agents.parseScan("0xzz\t1\t2\tclaude\t/tmp").length, 0)
 })
 
-test("an agent that wrote nothing since last time is waiting for you", () => {
-  const before = Agents.classify([], Agents.parseScan(SCAN), 45, 1000)
-  const same = Agents.classify(before, Agents.parseScan(SCAN), 45, 5000)
-  eq(same.map(s => s.working), [false, false, false])
+
+// Quiet has to persist before it counts, so a test about a stopped agent has
+// to let it stay stopped. Returns the state after `samples` quiet readings,
+// four seconds apart.
+function afterQuiet(scan, samples, options) {
+  const opts = options || {}
+  let state = Agents.classify([], scan, 45, 1000, opts.remembered, opts.marks)
+  let at = 1000
+  for (let i = 0; i < samples; i++) {
+    at += 4000
+    state = Agents.classify(state, scan, 45, at, opts.remembered, opts.marks)
+  }
+  return state
+}
+
+test("an agent that stays quiet is waiting for you", () => {
+  eq(afterQuiet(Agents.parseScan(SCAN), 3).map(s => s.working), [false, false, false])
+})
+
+// One quiet reading is not a stopped agent: a session waiting on work of its
+// own goes quiet in bursts, and reporting the first one is how three busy
+// agents get announced as three idle ones.
+test("one quiet reading is not enough to call an agent stopped", () => {
+  eq(afterQuiet(Agents.parseScan(SCAN), 1).map(s => s.working), [true, true, true])
+  eq(afterQuiet(Agents.parseScan(SCAN), 2).map(s => s.working), [true, true, true])
 })
 
 test("an agent that wrote past the threshold is working", () => {
@@ -44,20 +65,24 @@ test("an agent that wrote past the threshold is working", () => {
 })
 
 test("a terminal redrawing itself is not work", () => {
-  const before = Agents.classify([], Agents.parseScan(SCAN), 45, 1000)
-  const later = Agents.parseScan(SCAN).map(s => ({ ...s, written: s.written + 96 }))
-  eq(Agents.classify(before, later, 45, 5000)[0].working, false)
+  const drip = Agents.parseScan(SCAN).map(s => ({ ...s, written: s.written + 96 }))
+  let state = Agents.classify([], Agents.parseScan(SCAN), 45, 1000)
+  for (let i = 1; i <= 3; i++) state = Agents.classify(state, drip, 45, 1000 + i * 4000)
+  eq(state[0].working, false)
 })
 
 test("a session seen for the first time is given the benefit of the doubt", () => {
   eq(Agents.classify([], Agents.parseScan(SCAN), 45, 1000)[0].working, true)
 })
 
-test("the moment it stopped is kept, not restamped on every sample", () => {
-  const first = Agents.classify([], Agents.parseScan(SCAN), 45, 1000)
-  const stopped = Agents.classify(first, Agents.parseScan(SCAN), 45, 5000)
-  const later = Agents.classify(stopped, Agents.parseScan(SCAN), 45, 90000)
-  eq(later[0].idleSince, 5000)
+// The clock starts when it went quiet, not when the plugin got around to
+// believing it: nobody should be told an agent has been waiting ten seconds
+// less than it has.
+test("the moment it stopped is the first quiet sample, not the third", () => {
+  const scan = Agents.parseScan(SCAN)
+  const settled = afterQuiet(scan, 3)
+  eq(settled[0].idleSince, 5000)
+  eq(Agents.classify(settled, scan, 45, 90000)[0].idleSince, 5000)
 })
 
 test("going back to work clears the moment it stopped", () => {
@@ -150,9 +175,10 @@ test("a session that is busy and silent is working", () => {
 
 // And the one below it, which is a cursor blinking at a prompt.
 test("a session waiting on you is not", () => {
-  const first = Agents.classify([], Agents.parseScan(SCAN), 45, 1000)
   const blinking = Agents.parseScan(SCAN).map(s => ({ ...s, written: s.written + 32 }))
-  eq(Agents.classify(first, blinking, 45, 5000).map(s => s.working), [false, false, false])
+  let state = Agents.classify([], Agents.parseScan(SCAN), 45, 1000)
+  for (let i = 1; i <= 3; i++) state = Agents.classify(state, blinking, 45, 1000 + i * 4000)
+  eq(state.map(s => s.working), [false, false, false])
 })
 
 // A shell restart is not an agent doing anything, so it must not reset the
@@ -163,20 +189,13 @@ test("classify takes back a remembered waiting time", () => {
   const remembered = {}
   remembered[key] = 1000
 
-  // Two samples, because nothing is known from one: the first gives the
-  // benefit of the doubt, the second is the first real measurement.
-  const first = Agents.classify([], scan, 45, 500000, remembered)
-  eq(first[0].working, true)
-
-  const second = Agents.classify(first, scan, 45, 504000, remembered)
-  eq(second[0].working, false)
-  eq(second[0].idleSince, 1000)
+  const settled = afterQuiet(scan, 3, { remembered })
+  eq(settled[0].working, false)
+  eq(settled[0].idleSince, 1000)
 })
 
-test("a session nobody remembers starts its clock now", () => {
-  const scan = Agents.parseScan(SCAN)
-  const first = Agents.classify([], scan, 45, 500000, {})
-  eq(Agents.classify(first, scan, 45, 504000, {})[0].idleSince, 504000)
+test("a session nobody remembers starts its clock when it went quiet", () => {
+  eq(afterQuiet(Agents.parseScan(SCAN), 3, { remembered: {} })[0].idleSince, 5000)
 })
 
 test("the key is the pid and the window, not the pid alone", () => {
@@ -218,7 +237,7 @@ test("a mark saying working is taken at its word", () => {
   const first = Agents.classify([], scan, 45, 1000)
   const marks = {}
   marks[scan[0].pid] = { working: true, at: 0 }
-  const quiet = Agents.classify(first, scan, 45, 5000, null, marks)
+  const quiet = afterQuiet(scan, 3, { marks })
   eq(quiet[0].working, true)
   eq(quiet[1].working, false)
 })

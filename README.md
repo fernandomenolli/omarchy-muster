@@ -76,6 +76,12 @@ A session waiting on a background agent of its own sits in that middle band.
 It is busy, and it is not asking you for anything, so it counts as working.
 The line is drawn at 45 bytes a second, in the gap below it.
 
+**Quiet has to persist.** A session working on something of its own goes quiet
+in bursts, and one quiet reading is not a stopped agent: three in a row are,
+which is about ten seconds. The clock still starts at the first of them, so
+nobody is told an agent has been waiting ten seconds less than it has. An agent
+that says so through a hook is believed at once and skips the wait entirely.
+
 This is the part worth knowing before you trust it: the gap between waiting
 and busy-but-silent is about twelvefold, not the three orders of magnitude the
 extremes suggest. A rate rather than an amount per check, so that changing how
