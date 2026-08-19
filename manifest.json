@@ -21,8 +21,9 @@
     "defaults": {
       "intervalMs": 3000,
       "showWhenEmpty": false,
-      "agents": "claude codex gemini aider opencode amp goose crush",
-      "bytesPerSecond": 45
+      "agents": "claude codex gemini aider opencode amp goose crush antigravity cursor-agent copilot qwen opencoder",
+      "bytesPerSecond": 45,
+      "extraAgents": ""
     },
     "schema": [
       {
@@ -54,8 +55,15 @@
         "key": "agents",
         "type": "string",
         "label": "Process names to watch",
-        "defaultValue": "claude codex gemini aider opencode amp goose crush",
-        "description": "Separated by spaces. Anything that runs in a terminal and writes as it works belongs here."
+        "defaultValue": "claude codex gemini aider opencode amp goose crush antigravity cursor-agent copilot qwen opencoder",
+        "description": "The whole list, if you want to replace it. To add one name without restating the rest, use extraAgents instead."
+      },
+      {
+        "key": "extraAgents",
+        "type": "string",
+        "label": "Other process names to watch",
+        "defaultValue": "",
+        "description": "Added to the shipped list rather than replacing it, so a new agent costs one word here and nothing else."
       }
     ]
   }

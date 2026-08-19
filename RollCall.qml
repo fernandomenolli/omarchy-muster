@@ -39,6 +39,9 @@ Item {
   //
   // Filed by pid and window address together, so a pid that comes round again
   // under a different window does not inherit a stranger's clock.
+  // What the agents themselves have said, by pid. Set by bin/muster-mark from
+  // an agent's own hooks, and consulted before the bytes are believed.
+  property var marks: ({})
   property var remembered: ({})
   property bool recalling: true
   property int reads: 0
@@ -104,7 +107,7 @@ Item {
     }
 
     var at = Date.now()
-    sessions = Agents.classify(sessions, scan, bytesPerSecond, at, recalling ? remembered : null)
+    sessions = Agents.classify(sessions, scan, bytesPerSecond, at, recalling ? remembered : null, marks)
 
     // Nothing is measured until two samples apart have been taken, so the
     // note from last time is what answers the first real question and is then
@@ -184,6 +187,14 @@ Item {
       waitForEnd: true
       onStreamFinished: root.discover(text)
     }
+  }
+
+  function mark(pid, state) {
+    var next = {}
+    for (var key in marks) next[key] = marks[key]
+    next[String(pid)] = { working: state === "working", at: Date.now() }
+    marks = next
+    read()
   }
 
   function rediscover() {

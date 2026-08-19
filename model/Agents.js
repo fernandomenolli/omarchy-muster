@@ -78,7 +78,7 @@ function rememberedKey(session) {
   return String(session.pid) + ":" + String(session.address)
 }
 
-function classify(previous, scan, bytesPerSecond, at, remembered) {
+function classify(previous, scan, bytesPerSecond, at, remembered, marks) {
   var byPid = {}
   for (var i = 0; i < (previous || []).length; i++) byPid[previous[i].pid] = previous[i]
 
@@ -89,8 +89,16 @@ function classify(previous, scan, bytesPerSecond, at, remembered) {
     // Nothing is known until two samples apart have been taken, and an agent
     // nobody has measured yet gets the benefit of the doubt.
     var measured = seconds > 0
+    // An agent that can say what it is doing beats measuring what it writes.
+    // A mark saying it is working is taken at its word; a mark saying it is
+    // waiting is taken unless the bytes say plainly otherwise, because a
+    // stale mark should not be able to hold a busy agent in the waiting
+    // column forever.
+    var mark = marks ? marks[session.pid] : null
     var working = !measured || rate >= bytesPerSecond
+    if (mark && mark.working) working = true
     var recalled = remembered ? remembered[rememberedKey(session)] : 0
+
 
     return {
       address: session.address,
@@ -107,8 +115,11 @@ function classify(previous, scan, bytesPerSecond, at, remembered) {
       // The moment it stopped. Kept across samples, and across a restart of
       // the shell: a session that has been waiting forty minutes has been
       // waiting forty minutes, whatever happened to the thing watching it.
+      // A mark carries the moment the agent said so, which is exact where
+      // sampling is only close.
       idleSince: working ? 0
-        : (before && before.idleSince ? before.idleSince : (recalled || at))
+        : (mark && mark.at ? mark.at
+          : (before && before.idleSince ? before.idleSince : (recalled || at)))
     }
   })
 }

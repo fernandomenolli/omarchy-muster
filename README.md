@@ -101,10 +101,55 @@ o.bind("SUPER + A", "Next waiting agent",
   "omarchy-shell io.github.fernandomenolli.muster next")
 ```
 
+## Letting the agent say so
+
+Measuring bytes is a good guess and it is still a guess. An agent waiting on a
+job of its own writes almost nothing and looks exactly like one waiting on you,
+and an agent asking permission writes a single line and looks the same again.
+
+Claude Code can say which it is, through its hooks. Add this to
+`~/.claude/settings.json` and the roll call stops guessing for that agent:
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "~/.config/omarchy/plugins/io.github.fernandomenolli.muster/bin/muster-mark waiting" }] }
+    ],
+    "Notification": [
+      { "matcher": "permission_prompt", "hooks": [{ "type": "command", "command": "~/.config/omarchy/plugins/io.github.fernandomenolli.muster/bin/muster-mark waiting" }] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": "~/.config/omarchy/plugins/io.github.fernandomenolli.muster/bin/muster-mark working" }] }
+    ]
+  }
+}
+```
+
+`Stop` fires when it finishes answering, `permission_prompt` when it has been
+waiting about six seconds for you to approve a tool, and `UserPromptSubmit`
+when you have answered and it is going again. There is also an `idle_prompt`
+matcher, which waits a full minute before firing: too late to be the signal,
+though it costs nothing to add as well.
+
+**Nothing installs this for you.** That file is yours, and a plugin writing to
+it uninvited is not a favour. If your settings already has a `hooks` key, add
+these as siblings of what is in it rather than replacing the object.
+
+An agent that says it is working is taken at its word. One that says it is
+waiting is taken too, unless the bytes say plainly otherwise, so a stale mark
+left by a crashed session cannot hold a busy agent in the waiting column.
+
+Everything without hooks keeps working exactly as before, on the measurement.
+
 ## Any agent, not just one
 
 It watches process names, and ships knowing `claude`, `codex`, `gemini`,
-`aider`, `opencode`, `amp`, `goose` and `crush`. Add yours in the settings.
+`aider`, `opencode`, `amp`, `goose`, `crush`, `antigravity`, `cursor-agent`,
+`copilot`, `qwen` and `opencoder`. Add yours to *Other process names to watch*,
+which is added to that list rather than replacing it: agents come and go faster
+than a catalogue entry does, and anyone who had replaced the list to add a name
+would have kept an old one and missed the new.
 Anything that runs in a terminal and writes as it works belongs there.
 
 Finding the window is done by walking up from the agent to whichever ancestor

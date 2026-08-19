@@ -27,7 +27,13 @@ Panel {
 
   readonly property int bytesPerSecond: pref("bytesPerSecond", 45)
   readonly property bool showWhenEmpty: pref("showWhenEmpty", false)
-  readonly property string agents: setting("agents", "claude codex gemini aider opencode amp goose crush")
+  // The shipped list plus whatever you add, rather than a list you have to
+  // restate in full to add one name to. Agents come and go faster than a
+  // catalogue entry does: Omarchy itself has an open issue about Gemini
+  // becoming Antigravity, and anyone who had replaced this list to add a name
+  // would have kept the old one and lost the new.
+  readonly property string knownAgents: "claude codex gemini aider opencode amp goose crush antigravity cursor-agent copilot qwen opencoder"
+  readonly property string agents: setting("agents", knownAgents) + " " + setting("extraAgents", "")
 
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property color urgentColor: bar ? bar.urgent : Color.urgent
@@ -76,6 +82,11 @@ Panel {
     function close(): void { root.close() }
     function toggle(): void { root.toggle() }
     function count(): string { return roll.idleCount + "/" + roll.total }
+    // Called by bin/muster-mark, which agents call from their own hooks.
+    function mark(pid: string, state: string): string {
+      roll.mark(pid, state)
+      return "ok"
+    }
     // Straight to whichever has been waiting longest, for a keybinding.
     function next(): string {
       var waiting = Agents.waiting(roll.sessions)

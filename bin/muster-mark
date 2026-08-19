@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Tells the roll call what an agent is doing, from the agent itself.
+#
+#   muster-mark waiting     it has stopped and it is your turn
+#   muster-mark working     you have answered and it is going again
+#
+# Measuring bytes written to a terminal is a good guess and it is still a
+# guess: an agent waiting on a background job of its own writes almost nothing
+# and looks exactly like one waiting on you. An agent that can say so should
+# say so, and Claude Code can, through its hooks. See the README.
+#
+# This runs as a child of the agent, so the agent is up the parent chain. It
+# finds which ancestor is the one being watched and reports that.
+
+set -uo pipefail
+
+state="${1:-}"
+[[ $state == waiting || $state == working ]] || { echo "usage: muster-mark waiting|working" >&2; exit 2; }
+
+# Names worth reporting for. The plugin reads its own list from settings; this
+# is the shipped one, and an agent not in it simply cannot be marked.
+AGENTS="${MUSTER_AGENTS:-claude codex gemini aider opencode amp goose crush antigravity cursor-agent copilot qwen opencoder}"
+
+comm_of() { cat "/proc/$1/comm" 2>/dev/null; }
+parent_of() { awk '{ o = index($0, ")"); split(substr($0, o + 2), f, " "); print f[2] }' "/proc/$1/stat" 2>/dev/null; }
+
+up=$PPID
+for _ in $(seq 1 12); do
+  [[ -z $up || $up == 1 ]] && break
+  name=$(comm_of "$up")
+  for agent in $AGENTS; do
+    if [[ $name == "$agent" ]]; then
+      omarchy-shell io.github.fernandomenolli.muster mark "$up" "$state" >/dev/null 2>&1
+      exit 0
+    fi
+  done
+  up=$(parent_of "$up")
+done
+
+exit 0

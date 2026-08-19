@@ -211,3 +211,34 @@ test("forDisplay does not disturb the list it is given", () => {
   Agents.forDisplay(sessions)
   eq(sessions.map(s => s.pid), ["2", "1"])
 })
+
+// An agent that can say what it is doing beats measuring what it writes.
+test("a mark saying working is taken at its word", () => {
+  const scan = Agents.parseScan(SCAN)
+  const first = Agents.classify([], scan, 45, 1000)
+  const marks = {}
+  marks[scan[0].pid] = { working: true, at: 0 }
+  const quiet = Agents.classify(first, scan, 45, 5000, null, marks)
+  eq(quiet[0].working, true)
+  eq(quiet[1].working, false)
+})
+
+test("a mark saying waiting carries the moment it said so", () => {
+  const scan = Agents.parseScan(SCAN)
+  const first = Agents.classify([], scan, 45, 500000)
+  const marks = {}
+  marks[scan[0].pid] = { working: false, at: 123456 }
+  const stopped = Agents.classify(first, scan, 45, 504000, null, marks)
+  eq(stopped[0].working, false)
+  eq(stopped[0].idleSince, 123456)
+})
+
+// A stale mark must not hold a busy agent in the waiting column.
+test("bytes win over a mark that says waiting", () => {
+  const scan = Agents.parseScan(SCAN)
+  const first = Agents.classify([], scan, 45, 1000)
+  const busy = scan.map(s => ({ ...s, written: s.written + 20000 }))
+  const marks = {}
+  marks[scan[0].pid] = { working: false, at: 500 }
+  eq(Agents.classify(first, busy, 45, 5000, null, marks)[0].working, true)
+})

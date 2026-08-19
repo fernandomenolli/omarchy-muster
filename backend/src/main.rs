@@ -10,6 +10,11 @@ use std::fs;
 use std::process::Command;
 
 fn main() {
+    // Rust ignores SIGPIPE and panics on the failed write instead, so piping
+    // this into head printed a backtrace where the shell version printed
+    // nothing. Restore the default: a closed pipe ends the program quietly.
+    unsafe { libc_signal_default() }
+
     let agents: Vec<String> = std::env::var("MUSTER_AGENTS")
         .unwrap_or_else(|_| "claude codex gemini aider opencode amp goose crush".into())
         .split_whitespace()
@@ -126,4 +131,16 @@ fn main() {
 
 fn after<'a>(text: &'a str, key: &str) -> Option<&'a str> {
     text.find(key).map(|at| &text[at + key.len()..])
+}
+
+// One libc call rather than a dependency: this is the whole reason a crate
+// would have been added.
+unsafe extern "C" {
+    fn signal(signum: i32, handler: usize) -> usize;
+}
+
+unsafe fn libc_signal_default() {
+    const SIGPIPE: i32 = 13;
+    const SIG_DFL: usize = 0;
+    unsafe { signal(SIGPIPE, SIG_DFL); }
 }
