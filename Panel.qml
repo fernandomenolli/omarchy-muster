@@ -140,7 +140,7 @@ Panel {
 
       Text {
         anchors.verticalCenter: parent.verticalCenter
-        text: roll.idleCount > 0 ? "\uf054\u258c" : "\uf054"
+        text: roll.idleCount > 0 ? "󰩏" : "󱠯"
         color: content.tone
         font.family: root.fontFamily
         font.pixelSize: Style.font.body
