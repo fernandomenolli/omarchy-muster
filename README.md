@@ -134,18 +134,24 @@ This one is about work, not spend.
 
 ## Settings
 
-Omarchy has no settings screen yet, so a setting is a key on this widget's own
-entry in the bar layout of `~/.config/omarchy/shell.json`:
+Open the panel and they are switches. Tapping one takes effect straight away
+and is remembered in `~/.local/state/omarchy/plugins/io.github.fernandomenolli.muster/preferences.json`.
+
+Omarchy has no settings screen, and the shell hands a plugin a copy of its
+settings precisely so that changing them in place cannot leak back to disk. So
+the panel keeps its own file rather than writing yours. If you would rather set
+them in `~/.config/omarchy/shell.json`, a key on this widget's entry still
+works and is what the switches start from:
 
 ```json
 {
   "id": "io.github.fernandomenolli.muster",
-  "bytesPerSecond": 45,
-  "showWhenEmpty": true
+  "showWhenIdle": false
 }
 ```
 
-The panel has a button that opens that file in your editor.
+Delete the preferences file and the panel goes back to whatever shell.json
+says.
 
 | Setting | Default | What it does |
 |---|---|---|

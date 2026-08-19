@@ -17,8 +17,16 @@ Panel {
   manageIpc: false
 
   readonly property int intervalMs: setting("intervalMs", 3000)
-  readonly property int bytesPerSecond: setting("bytesPerSecond", 45)
-  readonly property bool showWhenEmpty: setting("showWhenEmpty", false)
+  // A preference tapped in the panel wins over one written by hand in
+  // shell.json, which in turn wins over the default. See Preferences.qml for
+  // why the panel does not write shell.json itself.
+  function pref(name, fallback) {
+    prefs.revision
+    return prefs.has(name) ? prefs.get(name, fallback) : setting(name, fallback)
+  }
+
+  readonly property int bytesPerSecond: pref("bytesPerSecond", 45)
+  readonly property bool showWhenEmpty: pref("showWhenEmpty", false)
   readonly property string agents: setting("agents", "claude codex gemini aider opencode amp goose crush")
 
   readonly property color foreground: bar ? bar.foreground : Color.foreground
@@ -37,6 +45,11 @@ Panel {
     Quickshell.execDetached(["hyprctl", "dispatch",
       "hl.dsp.focus({ window = \"address:" + address + "\" })"])
     close()
+  }
+
+  Preferences {
+    id: prefs
+    pluginId: "io.github.fernandomenolli.muster"
   }
 
   RollCall {
@@ -288,18 +301,36 @@ Panel {
 
           PanelSeparator { foreground: root.foreground }
 
-          // Omarchy has no settings screen, so a setting is a key in shell.json
-          // and the honest thing a panel can do is take you to it. Nothing here
-          // writes that file: a plugin editing the config of the person running
-          // it is not a favour, however small the edit.
-          Button {
+          PanelSectionHeader {
             width: parent.width
             text: "Settings"
-            iconText: "\uf013"
             foreground: root.foreground
             fontFamily: root.fontFamily
-            onClicked: Quickshell.execDetached(["omarchy-launch-config-editor",
-              (Quickshell.env("HOME") || "") + "/.config/omarchy/shell.json"])
+          }
+
+          Toggle {
+            width: parent.width
+            label: "Keep the icon when nothing runs"
+            description: "Off, and the roll call only appears in the bar while there is an agent to call."
+            checked: root.showWhenEmpty
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+            onClicked: prefs.set("showWhenEmpty", !root.showWhenEmpty)
+          }
+
+          // The one worth a dial. Waiting for you is about eight bytes a
+          // second, busy and silent about a hundred, producing output seven
+          // hundred and up: the line belongs in the first gap, and a terminal
+          // that draws more than most may want it moved.
+          NumberField {
+            label: "Bytes a second that count as working"
+            value: root.bytesPerSecond
+            from: 8
+            to: 500
+            stepSize: 5
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+            onModified: function(value) { prefs.set("bytesPerSecond", value) }
           }
 
         }
