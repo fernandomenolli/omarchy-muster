@@ -175,6 +175,7 @@ Panel {
       onTabRequested: function(direction) { root.switchPanel(direction) }
 
       Flickable {
+        id: flick
         anchors.fill: parent
         contentWidth: width
         contentHeight: column.implicitHeight
@@ -185,7 +186,14 @@ Panel {
 
         Column {
           id: column
-          width: parent.width
+          // The scrollbar is drawn over the content and the rows here run the
+          // full width, so it lands on their borders. The room it needs is
+          // given on both sides rather than one: a gutter on the right alone
+          // makes the two margins different, which is more visible than the
+          // bar ever was.
+          readonly property real gutter: flick.interactive ? Style.space(12) : 0
+          x: gutter
+          width: flick.width - gutter * 2
           spacing: Style.space(10)
 
           PanelHero {
