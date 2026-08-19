@@ -76,6 +76,15 @@ A session waiting on a background agent of its own sits in that middle band.
 It is busy, and it is not asking you for anything, so it counts as working.
 The line is drawn at 45 bytes a second, in the gap below it.
 
+**A title that moves is an agent moving.** An agent waiting on a shell command
+of its own writes almost nothing for as long as that command runs, and spins
+the whole time: the mark it draws animates, and the task it names changes as it
+goes. A window title that moved in the last twelve seconds counts as work, and
+that is what saves the case bytes get most wrong.
+
+Nothing here knows which mark means what, deliberately. Those belong to the
+agent and change between versions; what is read is whether the title moved.
+
 **Quiet has to persist.** A session working on something of its own goes quiet
 in bursts, and one quiet reading is not a stopped agent: three in a row are,
 which is about ten seconds. The clock still starts at the first of them, so
@@ -91,8 +100,9 @@ CPU time was tried first and is far worse: a terminal user interface redraws
 whether or not anything is happening, so three sessions burned similar CPU
 while two of them were doing nothing at all.
 
-Nothing depends on the mark an agent draws in its title. Those are theirs, and
-they change between versions.
+Nothing depends on knowing what the mark in a title means. Whether it moved is
+read; which glyph it is never is, because those are the agent's and change
+between versions.
 
 ## Using it
 

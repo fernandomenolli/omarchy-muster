@@ -261,3 +261,50 @@ test("bytes win over a mark that says waiting", () => {
   marks[scan[0].pid] = { working: false, at: 500 }
   eq(Agents.classify(first, busy, 45, 5000, null, marks)[0].working, true)
 })
+
+// An agent waiting on a shell command of its own writes almost nothing for as
+// long as that command runs, and spins the whole time. The spinner is in the
+// title, and a title that moves is the agent moving.
+test("a title that changed counts as work", () => {
+  const scan = Agents.parseScan(SCAN)
+  let state = Agents.classify([], scan, 45, 1000)
+  let at = 1000
+  for (let i = 0; i < 4; i++) {
+    at += 4000
+    const stirring = scan.map((s, index) => index === 0
+      ? { ...s, written: s.written + 20, title: (i % 2 ? "◐ " : "◑ ") + "same task" }
+      : s)
+    state = Agents.classify(state, stirring, 45, at)
+  }
+  eq(state[0].working, true)
+  eq(state[1].working, false)
+})
+
+test("a title that never moves does not save a quiet agent", () => {
+  const scan = Agents.parseScan(SCAN)
+  let state = Agents.classify([], scan, 45, 1000)
+  let at = 1000
+  for (let i = 0; i < 4; i++) {
+    at += 4000
+    state = Agents.classify(state, scan.map(s => ({ ...s, written: s.written + 20 })), 45, at)
+  }
+  eq(state.map(s => s.working), [false, false, false])
+})
+
+// The mark animates about once a second and this looks every three, so two
+// readings in a row can catch the same frame. A title that moved recently
+// still counts as moving.
+test("a title that moved recently still counts, even if this sample matched", () => {
+  const scan = Agents.parseScan(SCAN)
+  const moved = scan.map((s, i) => i === 0 ? { ...s, title: "◐ same task" } : s)
+  let state = Agents.classify([], scan, 45, 1000)
+  state = Agents.classify(state, moved, 45, 5000)          // title moves here
+  state = Agents.classify(state, moved, 45, 9000)          // same frame twice
+  state = Agents.classify(state, moved, 45, 13000)         // and again
+  eq(state[0].working, true)
+  // Past twelve seconds with nothing moving, the bytes have the last word.
+  state = Agents.classify(state, moved, 45, 25000)
+  state = Agents.classify(state, moved, 45, 29000)
+  state = Agents.classify(state, moved, 45, 33000)
+  eq(state[0].working, false)
+})

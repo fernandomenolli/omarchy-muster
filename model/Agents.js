@@ -104,7 +104,25 @@ function classify(previous, scan, bytesPerSecond, at, remembered, marks, patienc
     // agent has been waiting ten seconds less than it has.
     var recalled = remembered ? remembered[rememberedKey(session)] : 0
     var wait = patience || 3
-    var below = measured && rate < bytesPerSecond
+
+    // A title that changed is an agent doing something. The mark an agent
+    // draws while it works animates, and the task it names changes as it goes,
+    // so a title that moved between two samples is activity even when almost
+    // nothing was written — which is exactly the case bytes get wrong: an
+    // agent waiting on a shell command of its own spins for a minute and
+    // writes a few dozen bytes.
+    //
+    // Nothing here knows which marks mean what, and that is the point: those
+    // are the agent's and they change between versions. A title that does not
+    // move is the only thing being read.
+    // Remembered rather than compared against the last sample alone: the mark
+    // animates about once a second and this looks every three, so two readings
+    // in a row can catch the same frame by chance. Twelve seconds since the
+    // title last moved still counts as moving.
+    var stirred = before && before.title !== undefined && session.title !== before.title
+    var stirredAt = stirred ? at : ((before && before.stirredAt) || 0)
+    var moving = stirredAt > 0 && (at - stirredAt) < 12000
+    var below = measured && rate < bytesPerSecond && !moving
     var quiet = below ? ((before && before.quiet) || 0) + 1 : 0
     var quietSince = !below ? 0 : (before && before.quietSince ? before.quietSince : at)
 
@@ -120,6 +138,7 @@ function classify(previous, scan, bytesPerSecond, at, remembered, marks, patienc
       sampledAt: at,
       quiet: quiet,
       quietSince: quietSince,
+      stirredAt: stirredAt,
       agent: session.agent,
       cwd: session.cwd,
       title: session.title,
