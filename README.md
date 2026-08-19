@@ -134,6 +134,19 @@ This one is about work, not spend.
 
 ## Settings
 
+Omarchy has no settings screen yet, so a setting is a key on this widget's own
+entry in the bar layout of `~/.config/omarchy/shell.json`:
+
+```json
+{
+  "id": "io.github.fernandomenolli.muster",
+  "bytesPerSecond": 45,
+  "showWhenEmpty": true
+}
+```
+
+The panel has a button that opens that file in your editor.
+
 | Setting | Default | What it does |
 |---|---|---|
 | Check every | 3000 ms | |

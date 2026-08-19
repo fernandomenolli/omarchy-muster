@@ -285,6 +285,23 @@ Panel {
               }
             }
           }
+
+          PanelSeparator { foreground: root.foreground }
+
+          // Omarchy has no settings screen, so a setting is a key in shell.json
+          // and the honest thing a panel can do is take you to it. Nothing here
+          // writes that file: a plugin editing the config of the person running
+          // it is not a favour, however small the edit.
+          Button {
+            width: parent.width
+            text: "Settings"
+            iconText: "\uf013"
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+            onClicked: Quickshell.execDetached(["omarchy-launch-config-editor",
+              (Quickshell.env("HOME") || "") + "/.config/omarchy/shell.json"])
+          }
+
         }
       }
     }
