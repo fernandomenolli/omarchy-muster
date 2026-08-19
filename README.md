@@ -41,14 +41,12 @@ the answer survives the shell restarting. Nothing else is written anywhere.
 
 *The hand, and the count when there is one.*
 
-A hand up. An agent that stops is not reporting a status, it is asking you
-something, and the gesture for that is the one everybody learned in a classroom
-before they learned anything else on this machine. It is an outline while
-everything is running and fills in when someone is waiting on you.
+A prompt and a cursor. When an agent stops, what it is showing you is a prompt
+waiting to be typed into, and that is the one symbol every person who would
+install this reads without being taught.
 
-Weight rather than colour, deliberately. Red in this bar means something is the
-matter, and an agent finishing its turn is not that: it is the ordinary end of
-a piece of work.
+The cursor is the state. Nothing waiting on you and there is no cursor, just
+the prompt; the moment one stops, the cursor appears beside it with the count.
 
 The number beside it only appears when it has something to say, and then it
 says one thing: how many agents are waiting on you. A count sitting at nought
