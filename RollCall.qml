@@ -45,6 +45,13 @@ Item {
   property var remembered: ({})
   property bool recalling: true
   property int reads: 0
+
+  // The moment the readings now in hand were asked for. A view is reloaded at
+  // the end of a cycle and read at the start of the next, so the bytes belong
+  // to when the reload was requested and not to when they were picked up.
+  // Stamping them with the pickup time divides a three second delta by
+  // whatever the gap happened to be.
+  property real requestedAt: 0
   property string savedSignature: ""
 
   readonly property int total: sessions.length
@@ -70,8 +77,6 @@ Item {
     } else {
       found = scanned
     }
-
-    read()
   }
 
   // The hot path: for each agent already found, how many bytes it has
@@ -106,7 +111,9 @@ Item {
       })
     }
 
-    var at = Date.now()
+    var now = Date.now()
+    var at = requestedAt || now
+    requestedAt = now
     sessions = Agents.classify(sessions, scan, bytesPerSecond, at, recalling ? remembered : null, marks)
 
     // Nothing is measured until two samples apart have been taken, so the
