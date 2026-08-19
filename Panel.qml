@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Shapes
 import Quickshell
 import Quickshell.Io
 import qs.Commons
@@ -131,20 +132,59 @@ Panel {
     Row {
       id: content
       anchors.centerIn: parent
-      spacing: Style.space(3)
+      spacing: Style.space(6)
 
       // One colour, always. Red is what this bar uses for something being the
       // matter, and an agent finishing its turn is not that: it is the ordinary
       // end of a piece of work. The weight of the mark carries it instead.
       readonly property color tone: button.foreground
 
-      Text {
+      // A prompt and a cursor, drawn rather than taken from the font, which
+      // has no chevron with the weight of a prompt: the typographic one is a
+      // thin ornament and the bold one is a navigation arrow.
+      //
+      // The cursor is the state. Nothing waiting on you and there is none,
+      // just the prompt; the moment an agent stops, the cursor appears where
+      // your answer would go.
+      Row {
         anchors.verticalCenter: parent.verticalCenter
-        text: roll.idleCount > 0 ? "󰩏" : "󱠯"
-        color: content.tone
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.body
-        Behavior on color { ColorAnimation { duration: 220 } }
+        spacing: Style.space(1)
+
+        Shape {
+          id: caret
+          anchors.verticalCenter: parent.verticalCenter
+          width: Style.space(10)
+          height: Style.space(12)
+          preferredRendererType: Shape.CurveRenderer
+
+          readonly property real inset: Style.space(1.5)
+
+          ShapePath {
+            strokeColor: content.tone
+            strokeWidth: Math.max(2, Style.space(2.4))
+            fillColor: "transparent"
+            capStyle: ShapePath.RoundCap
+            joinStyle: ShapePath.RoundJoin
+
+            startX: caret.inset
+            startY: caret.inset
+            PathLine { x: caret.width - caret.inset; y: caret.height / 2 }
+            PathLine { x: caret.inset; y: caret.height - caret.inset }
+
+            Behavior on strokeColor { ColorAnimation { duration: 220 } }
+          }
+        }
+
+        // A character cell: as tall as the line, half as wide.
+        Rectangle {
+          anchors.verticalCenter: parent.verticalCenter
+          visible: roll.idleCount > 0
+          width: Style.space(3)
+          height: Style.space(12)
+          radius: width / 2
+          color: content.tone
+          Behavior on color { ColorAnimation { duration: 220 } }
+        }
       }
 
       Text {
