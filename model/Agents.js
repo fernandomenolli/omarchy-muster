@@ -154,3 +154,16 @@ function waitingSignature(sessions) {
     .sort()
     .join("|")
 }
+
+// The order to read them in. You open the roll call to find out who is waiting
+// on you, so those come first and the one that has been waiting longest is at
+// the top; the rest follow in the order the scan settled on. Sorting by pid,
+// which is what the scan needs so each agent stays paired with its own file,
+// puts the answer wherever the kernel happened to put it.
+function forDisplay(sessions) {
+  return (sessions || []).slice().sort(function(a, b) {
+    if (a.working !== b.working) return a.working ? 1 : -1
+    if (!a.working && !b.working) return (a.idleSince || 0) - (b.idleSince || 0)
+    return Number(a.pid) - Number(b.pid)
+  })
+}

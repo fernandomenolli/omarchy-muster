@@ -222,7 +222,7 @@ Panel {
             spacing: Style.space(2)
 
             Repeater {
-              model: roll.sessions
+              model: Agents.forDisplay(roll.sessions)
 
               Item {
                 id: row
@@ -318,20 +318,7 @@ Panel {
             onClicked: prefs.set("showWhenEmpty", !root.showWhenEmpty)
           }
 
-          // The one worth a dial. Waiting for you is about eight bytes a
-          // second, busy and silent about a hundred, producing output seven
-          // hundred and up: the line belongs in the first gap, and a terminal
-          // that draws more than most may want it moved.
-          NumberField {
-            label: "Bytes a second that count as working"
-            value: root.bytesPerSecond
-            from: 8
-            to: 500
-            stepSize: 5
-            foreground: root.foreground
-            fontFamily: root.fontFamily
-            onModified: function(value) { prefs.set("bytesPerSecond", value) }
-          }
+
 
         }
       }

@@ -193,3 +193,21 @@ test("waitingSignature changes only when the waiting does", () => {
   eq(Agents.waitingSignature(a) === Agents.waitingSignature(c), false)
   eq(Agents.waitingSignature([{ pid: "1", address: "0x1", working: true }]), "")
 })
+
+// You open the roll call to find who is waiting on you. Sorting by pid puts
+// that answer wherever the kernel happened to put it.
+test("forDisplay puts the ones waiting on you first, longest first", () => {
+  const sessions = [
+    { pid: "300", address: "0x3", working: true },
+    { pid: "100", address: "0x1", working: false, idleSince: 9000 },
+    { pid: "200", address: "0x2", working: true },
+    { pid: "400", address: "0x4", working: false, idleSince: 3000 }
+  ]
+  eq(Agents.forDisplay(sessions).map(s => s.pid), ["400", "100", "200", "300"])
+})
+
+test("forDisplay does not disturb the list it is given", () => {
+  const sessions = [{ pid: "2", working: true }, { pid: "1", working: false, idleSince: 5 }]
+  Agents.forDisplay(sessions)
+  eq(sessions.map(s => s.pid), ["2", "1"])
+})

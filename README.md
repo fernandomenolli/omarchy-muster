@@ -153,6 +153,13 @@ works and is what the switches start from:
 Delete the preferences file and the panel goes back to whatever shell.json
 says.
 
+**The threshold is not one of the switches, on purpose.** Nobody can tell what
+forty-five bytes a second means by looking at it, and the two ways of getting
+it wrong both look like the plugin working: set it low and nothing is ever
+reported as waiting, set it high and everything is. It is a calibration, not a
+preference, and it stays in the file where changing it means having read what
+the three bands are.
+
 | Setting | Default | What it does |
 |---|---|---|
 | Check every | 3000 ms | |
