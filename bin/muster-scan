@@ -71,6 +71,18 @@ matches=$(cat /proc/[0-9]*/stat 2>/dev/null | awk -v agents="$AGENTS" -v windows
     if (comm in wanted) name[pid] = comm
   }
   END {
+    # Two passes, because awk walks a hash in whatever order it likes: the
+    # count of agents running under a session has to be complete before that
+    # session is printed, and a single pass would print some of them first.
+    for (pid in name) {
+      up = parent[pid]
+      for (hop = 0; hop < 12 && up != "" && up != "1"; hop++) {
+        if (up in name) { under[up]++; break }
+        if (up in address) break
+        up = parent[up]
+      }
+    }
+
     for (pid in name) {
       up = pid
       for (hop = 0; hop < 12 && up != "" && up != "1"; hop++) {
@@ -90,7 +102,7 @@ matches=$(cat /proc/[0-9]*/stat 2>/dev/null | awk -v agents="$AGENTS" -v windows
           }
           close(io)
 
-          print address[up] "\t" pid "\t" written "\t" name[pid] "\t" title[up]
+          print address[up] "\t" pid "\t" written "\t" name[pid] "\t" title[up] "\t" (pid in under ? under[pid] : 0)
           break
         }
         up = parent[up]
@@ -103,7 +115,7 @@ matches=$(cat /proc/[0-9]*/stat 2>/dev/null | awk -v agents="$AGENTS" -v windows
 
 # Only the directory still needs a syscall awk cannot make, and only for the
 # handful that matched.
-while IFS=$'\t' read -r window pid written agent title; do
+while IFS=$'\t' read -r window pid written agent title under; do
   cwd=$(readlink "/proc/$pid/cwd" 2>/dev/null || true)
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$window" "$pid" "$written" "$agent" "${cwd:-}" "$title"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$window" "$pid" "$written" "$agent" "${cwd:-}" "$title" "${under:-0}"
 done <<< "$matches"

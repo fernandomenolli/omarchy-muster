@@ -14,7 +14,8 @@ test("a scan line is read into a session", () => {
     written: 4768152442,
     agent: "claude",
     cwd: "/home/fernando/Projects/risecode",
-    title: "✳ Revisar cards"
+    title: "✳ Revisar cards",
+    under: 0
   })
 })
 
@@ -307,4 +308,17 @@ test("a title that moved recently still counts, even if this sample matched", ()
   state = Agents.classify(state, moved, 45, 29000)
   state = Agents.classify(state, moved, 45, 33000)
   eq(state[0].working, false)
+})
+
+// A session whose turn ended is showing a prompt and writing nothing, and if a
+// subagent it started is still running then it is not waiting on you.
+test("an agent with an agent under it is working", () => {
+  const scan = Agents.parseScan(
+    "0x1\t100\t500\tclaude\t/home/me/atlas\t✳ quiet\t1\n" +
+    "0x2\t200\t500\tclaude\t/home/me/beep\t✳ quiet\t0")
+  eq(scan.map(s => s.under), [1, 0])
+
+  let state = Agents.classify([], scan, 45, 1000)
+  for (let i = 1; i <= 4; i++) state = Agents.classify(state, scan, 45, 1000 + i * 4000)
+  eq(state.map(s => s.working), [true, false])
 })

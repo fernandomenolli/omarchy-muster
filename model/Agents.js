@@ -2,7 +2,9 @@
 
 // One line per running agent, tab separated, as the scan prints it:
 //
-//   0x55896ddddfc0\t196814\t4768152442\tclaude\t/home/fernando/Projects/risecode\t✳ Revisar cards
+//   0x55896ddddfc0\t196814\t4768152442\tclaude\t/home/me/atlas\t✳ Revisar cards\t0
+//
+// The last field is how many agents are running under that one.
 //
 // Tabs rather than spaces: a window title is written by whatever program owns
 // the window, and half of them contain spaces.
@@ -23,7 +25,8 @@ function parseScan(text) {
       written: written,
       agent: parts[3],
       cwd: parts[4] || "",
-      title: parts[5] || ""
+      title: parts[5] || "",
+      under: Number(parts[6]) || 0
     })
   }
 
@@ -119,10 +122,16 @@ function classify(previous, scan, bytesPerSecond, at, remembered, marks, patienc
     // animates about once a second and this looks every three, so two readings
     // in a row can catch the same frame by chance. Twelve seconds since the
     // title last moved still counts as moving.
+    // An agent running under this one is work in flight. The session's own
+    // terminal can be perfectly quiet — the turn ended and it is showing a
+    // prompt — while a subagent it started is still going, and telling you it
+    // is waiting on you then is telling you the wrong thing.
+    var busyBelow = (session.under || 0) > 0
+
     var stirred = before && before.title !== undefined && session.title !== before.title
     var stirredAt = stirred ? at : ((before && before.stirredAt) || 0)
     var moving = stirredAt > 0 && (at - stirredAt) < 12000
-    var below = measured && rate < bytesPerSecond && !moving
+    var below = measured && rate < bytesPerSecond && !moving && !busyBelow
     var quiet = below ? ((before && before.quiet) || 0) + 1 : 0
     var quietSince = !below ? 0 : (before && before.quietSince ? before.quietSince : at)
 
@@ -142,6 +151,7 @@ function classify(previous, scan, bytesPerSecond, at, remembered, marks, patienc
       agent: session.agent,
       cwd: session.cwd,
       title: session.title,
+      under: session.under || 0,
       working: working,
       // The moment it stopped, kept across samples so the panel can say how
       // long it has been sitting there. A session that never worked has no

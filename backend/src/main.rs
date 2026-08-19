@@ -91,6 +91,30 @@ fn main() {
 
     let matched: std::collections::HashSet<i32> = found.iter().map(|(pid, _)| *pid).collect();
 
+    // How many agents are running under each session. A session with one has
+    // work in flight however quiet its own terminal has gone, which is the
+    // case measuring bytes gets most wrong.
+    let mut under: HashMap<i32, u32> = HashMap::new();
+    for (pid, _) in &found {
+        let mut up = match parent.get(pid) {
+            Some(&next) if next > 1 => next,
+            _ => continue,
+        };
+        for _ in 0..12 {
+            if matched.contains(&up) {
+                *under.entry(up).or_insert(0) += 1;
+                break;
+            }
+            if windows.contains_key(&up) {
+                break;
+            }
+            match parent.get(&up) {
+                Some(&next) if next > 1 => up = next,
+                _ => break,
+            }
+        }
+    }
+
     for (pid, agent) in &found {
         let (pid, agent) = (*pid, agent);
         let mut up = pid;
@@ -118,7 +142,8 @@ fn main() {
                     .map(|p| p.to_string_lossy().into_owned())
                     .unwrap_or_default();
 
-                println!("{address}\t{pid}\t{written}\t{agent}\t{cwd}\t{title}");
+                let nested = under.get(&pid).copied().unwrap_or(0);
+                println!("{address}\t{pid}\t{written}\t{agent}\t{cwd}\t{title}\t{nested}");
                 break;
             }
             match parent.get(&up) {

@@ -76,6 +76,12 @@ A session waiting on a background agent of its own sits in that middle band.
 It is busy, and it is not asking you for anything, so it counts as working.
 The line is drawn at 45 bytes a second, in the gap below it.
 
+**An agent running under one is work in flight.** A session whose turn ended is
+showing a prompt and writing nothing, and if a subagent it started is still
+going then it is not waiting on you. The scan already finds those — it has to,
+to keep them from being counted as sessions of their own — so it counts them on
+the way past.
+
 **A title that moves is an agent moving.** An agent waiting on a shell command
 of its own writes almost nothing for as long as that command runs, and spins
 the whole time: the mark it draws animates, and the task it names changes as it
